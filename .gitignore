@@ -6,3 +6,6 @@ dist/
 .env
 api/src/generated/
 dist-cli/
+.claude/worktrees/
+.claude/settings.local.json
+client/next-env.d.ts

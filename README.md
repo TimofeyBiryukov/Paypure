@@ -17,14 +17,24 @@ so the first invoice gets number **188**.
 Optional: `docker compose --profile tools up -d adminer` (DB UI on :8081). Emails use
 `MAIL_TRANSPORT=log`: each one is written in full to the API log (`docker compose logs api`).
 
-Checks (all run in containers):
+Checks: `bash scripts/agent/check.sh` runs lint, typecheck and tests on the host. Add `--full`
+for production builds. CI runs the same checks on every PR, plus migrations against a fresh
+Postgres.
+
+## Working with agents
+
+Agents work in parallel, each in its own git worktree with its own branch, ports and database,
+and merge their own PRs once CI passes. The rules are in [`AGENTS.md`](AGENTS.md).
 
 ```bash
-docker compose exec -w /app/packages/domain api pnpm test
-docker compose exec -w /app/api api pnpm exec tsc --noEmit
-docker compose exec -w /app/client client pnpm exec tsc --noEmit
-docker compose exec api pnpm exec biome lint client/src api/src
+claude -w fix-rounding            # Claude Code: worktree + setup, one per task
+scripts/agent/new.sh fix-rounding # any other agent: creates and sets up the worktree
+scripts/agent/prune.sh --list     # every worktree with its PR state and stack
+scripts/agent/prune.sh --yes      # remove worktrees (and stacks) whose PRs are merged
 ```
+
+Hooks keep agents out of this checkout. To let an agent work here, start it with
+`PAYPURE_PRIMARY=1 claude`.
 
 ## Layout (Tech §3)
 

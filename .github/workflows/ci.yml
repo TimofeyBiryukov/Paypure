@@ -1,0 +1,60 @@
+name: CI
+
+# The required check on main (branch protection: "check", strict = PR must be
+# up to date with main). scripts/agent/land.sh waits for it before merging.
+# The gate itself is scripts/agent/check.sh so local and CI cannot drift;
+# this job adds what needs a database or is too slow for every local run.
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: paypure
+          POSTGRES_PASSWORD: paypure
+          POSTGRES_DB: paypure
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U paypure"
+          --health-interval 3s
+          --health-retries 20
+    env:
+      DATABASE_URL: postgresql://paypure:paypure@localhost:5432/paypure
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Gate (lint, typecheck, unit tests, builds)
+        run: bash scripts/agent/check.sh --full
+
+      # Same as docker-entrypoint-initdb.d does for the dev stack.
+      - name: Create the app role
+        env:
+          PGPASSWORD: paypure
+        run: psql -h localhost -U paypure -d paypure -v ON_ERROR_STOP=1 -f api/prisma/init/01-app-role.sql
+
+      - name: Migrations apply to an empty database
+        working-directory: api
+        run: pnpm exec prisma migrate deploy
+
+      # schema.prisma edited without a migration (or the reverse) fails here.
+      - name: schema.prisma matches the migrations
+        working-directory: api
+        run: pnpm exec prisma migrate diff --from-config-datasource --to-schema prisma/schema.prisma --exit-code

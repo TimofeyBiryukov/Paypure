@@ -1,4 +1,6 @@
 # Dev: `docker compose up` starts the whole system (Tech §7.1). No .env needed (R2).
+# Agent worktrees get a generated .env (scripts/agent/setup.sh) that sets
+# COMPOSE_PROJECT_NAME and every host port below, so stacks never collide.
 x-node-dev: &node-dev
   restart: unless-stopped
   init: true
@@ -75,7 +77,7 @@ services:
       SESSION_SECRET: ${SESSION_SECRET:-dev-only-session-secret}
       PRINT_SIGNING_SECRET: ${PRINT_SIGNING_SECRET:-dev-only-print-secret}
       NODE_OPTIONS: --max-old-space-size=384
-    ports: ["${API_PORT:-4000}:4000", "9229:9229"]
+    ports: ["${API_PORT:-4000}:4000", "${API_DEBUG_PORT:-9229}:9229"]
     volumes: *node-volumes
     depends_on:
       deps: { condition: service_completed_successfully }
@@ -93,7 +95,7 @@ services:
       API_URL: http://api:4000
       PUBLIC_URL: ${PUBLIC_URL:-http://localhost:3000}
       PRINT_SIGNING_SECRET: ${PRINT_SIGNING_SECRET:-dev-only-print-secret}
-    ports: ["${CLIENT_PORT:-3000}:3000", "9230:9229"]
+    ports: ["${CLIENT_PORT:-3000}:3000", "${CLIENT_DEBUG_PORT:-9230}:9229"]
     volumes:
       - .:/app
       - node_modules:/app/node_modules
@@ -113,12 +115,12 @@ services:
 
   mailpit:
     image: axllent/mailpit
-    ports: ["8025:8025"]
+    ports: ["${MAILPIT_PORT:-8025}:8025"]
     profiles: [mail]
 
   adminer:
     image: michalhosna/adminer
-    ports: ["8081:8080"]
+    ports: ["${ADMINER_PORT:-8081}:8080"]
     environment:
       ADMINER_DRIVER: pgsql
       ADMINER_SERVER: postgres
@@ -136,4 +138,5 @@ volumes:
   client_node_modules: {}
   domain_node_modules: {}
   client_next: {}
-  pnpm_store: {}
+  # Shared by every stack (primary + agent worktrees) so installs stay fast.
+  pnpm_store: { name: paypure_pnpm_store }

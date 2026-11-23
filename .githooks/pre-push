@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+# Pre-push gate (AGENTS.md § Testing). In agent worktrees, every pushed commit
+# must have passed scripts/agent/check.sh. The primary checkout (the human's)
+# is exempt. CI runs the same gate again on the PR.
+set -euo pipefail
+source "$(git rev-parse --show-toplevel)/scripts/agent/lib.sh"
+
+in_linked_worktree || exit 0
+
+zero=0000000000000000000000000000000000000000
+stamp=$(cat "$(wt_gitdir)/paypure-check-ok" 2>/dev/null || true)
+
+while read -r _local_ref local_sha remote_ref _remote_sha; do
+  [ "$local_sha" = "$zero" ] && continue # branch deletion
+  case "$remote_ref" in
+  refs/heads/main | refs/heads/master) die "[pre-push] never push to main; use scripts/agent/land.sh" ;;
+  esac
+  [ "$local_sha" = "$stamp" ] && continue
+  if [ "$local_sha" = "$(git rev-parse HEAD)" ] && [ -z "$(git status --porcelain)" ]; then
+    say "[pre-push] ${local_sha:0:7} has not passed the gate yet; running it"
+    bash scripts/agent/check.sh || die "[pre-push] gate failed; push refused"
+  else
+    die "[pre-push] ${local_sha:0:7} has not passed scripts/agent/check.sh.
+Check out that commit with a clean tree and run the gate, then push."
+  fi
+done

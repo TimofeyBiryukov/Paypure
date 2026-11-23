@@ -1,0 +1,17 @@
+---
+description: Paypure multi-agent workflow — worktree per task, check.sh gate, land.sh to merge
+alwaysApply: true
+---
+
+# Paypure agent workflow
+
+Full rules: `AGENTS.md`. Read it before your first change.
+
+- Work in your own worktree (Cursor worktree agent, or `scripts/agent/new.sh <name>`).
+  Never edit, run git writes or run `docker compose` in the primary checkout.
+  `scripts/agent/guard.mjs` blocks those commands.
+- Behaviour changes ship with tests. `scripts/agent/check.sh` must pass, and never
+  weaken it to get green.
+- Ship with `scripts/agent/land.sh`. It merges main in, runs the gate, opens the PR,
+  waits for CI and squash-merges. Never push to main, never force-push.
+- Conflicts: AGENTS.md § Conflicts. Your own stack: `scripts/agent/stack.sh`.
