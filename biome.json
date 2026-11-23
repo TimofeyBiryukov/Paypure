@@ -1,0 +1,14 @@
+{
+  "$schema": "https://biomejs.dev/schemas/2.6.8/schema.json",
+  "files": { "includes": ["**", "!**/dist", "!**/.next", "!**/generated", "!docs", "!data"] },
+  "formatter": { "indentStyle": "space", "indentWidth": 2, "lineWidth": 100 },
+  "linter": {
+    "rules": {
+      "preset": "recommended",
+      "a11y": { "useButtonType": "error" },
+      "style": { "useImportType": "off" }
+    }
+  },
+  "css": { "parser": { "tailwindDirectives": true } },
+  "javascript": { "parser": { "unsafeParameterDecoratorsEnabled": true } }
+}

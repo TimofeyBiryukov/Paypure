@@ -1,1 +1,8 @@
 data/
+node_modules/
+dist/
+.next/
+*.tsbuildinfo
+.env
+api/src/generated/
+dist-cli/

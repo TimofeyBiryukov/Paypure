@@ -1,0 +1,573 @@
+// Paypure data model (Brief §7, Tech §5.2, 06 §2.2, 07, 08 §3.1).
+// Partial indexes, exclusion constraints, checks and triggers that Prisma can't express live in
+// the hand-edited migration SQL (prisma/migrations/*/migration.sql).
+
+generator client {
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  moduleFormat = "cjs"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum MemberRole {
+  admin
+  member
+}
+
+enum MemberStatus {
+  invited
+  active
+  deactivated
+}
+
+enum NumberReset {
+  never
+  yearly
+}
+
+enum BillingMode {
+  hourly
+  fixed
+  non_billable
+}
+
+enum ProjectStatus {
+  active
+  completed
+}
+
+enum BudgetKind {
+  hours
+  money
+}
+
+enum TimeEntryState {
+  running
+  paused
+  stopped
+}
+
+enum OffInvoiceKind {
+  billed_elsewhere
+  written_off
+}
+
+enum InvoiceStatus {
+  draft
+  issued
+  void
+}
+
+enum InvoiceSource {
+  paypure
+  paydirt
+}
+
+enum LineKind {
+  time
+  fixed
+  manual
+  discount
+}
+
+enum PaymentAccountMode {
+  default
+  account
+  none
+}
+
+enum PaymentKind {
+  payment
+  refund
+}
+
+enum EmailStatus {
+  queued
+  waiting_for_pdf
+  sent
+  failed
+}
+
+enum EmailKind {
+  invoice
+  correction
+  reminder
+  thank_you
+  test
+  invite
+  password_reset
+}
+
+model Workspace {
+  id                  String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name                String
+  currency            String      @db.Char(3)
+  timeZone            String      @map("time_zone")
+  defaultRateMinor    Int?        @map("default_rate_minor")
+  defaultTermsDays    Int         @default(14) @map("default_terms_days")
+  numberFormat        String      @default("INV-{YYYY}-{seq:4}") @map("number_format")
+  numberReset         NumberReset @default(yearly) @map("number_reset")
+  defaultNotes        String      @default("") @map("default_notes")
+  readyThresholdMinor Int         @default(100000) @map("ready_threshold_minor")
+  businessName        String      @default("") @map("business_name")
+  senderName          String      @default("") @map("sender_name")
+  address             String      @default("")
+  phone               String      @default("")
+  taxId               String      @default("") @map("tax_id")
+  billingEmail        String      @default("") @map("billing_email")
+  createdAt           DateTime    @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt           DateTime    @updatedAt @map("updated_at") @db.Timestamptz
+
+  members          Member[]
+  clients          Client[]
+  defaultTaxes     WorkspaceDefaultTax[]
+  emailTemplates   EmailTemplate[]
+  paymentAccounts  PaymentAccount[]
+  invoiceSequences InvoiceSequence[]
+
+  @@map("workspaces")
+}
+
+model WorkspaceDefaultTax {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  workspaceId String    @map("workspace_id") @db.Uuid
+  name        String
+  rateBp      Int       @map("rate_bp")
+  position    Int       @default(0)
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  workspace   Workspace @relation(fields: [workspaceId], references: [id])
+
+  @@map("workspace_default_taxes")
+}
+
+model EmailTemplate {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  workspaceId String    @map("workspace_id") @db.Uuid
+  kind        EmailKind
+  subject     String
+  body        String
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  workspace   Workspace @relation(fields: [workspaceId], references: [id])
+
+  @@unique([workspaceId, kind])
+  @@map("email_templates")
+}
+
+model Member {
+  id           String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  workspaceId  String       @map("workspace_id") @db.Uuid
+  name         String
+  email        String
+  role         MemberRole   @default(member)
+  status       MemberStatus @default(invited)
+  passwordHash String?      @map("password_hash")
+  timeZone     String       @default("UTC") @map("time_zone")
+  timeFormat   String       @default("24h") @map("time_format")
+  weekStart    Int          @default(1) @map("week_start")
+  inviteToken  String?      @unique @map("invite_token_hash")
+  createdAt    DateTime     @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt    DateTime     @updatedAt @map("updated_at") @db.Timestamptz
+
+  workspace   Workspace   @relation(fields: [workspaceId], references: [id])
+  sessions    Session[]
+  timeEntries TimeEntry[]
+
+  @@unique([workspaceId, email])
+  @@map("members")
+}
+
+model Session {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  memberId   String   @map("member_id") @db.Uuid
+  tokenHash  String   @unique @map("token_hash")
+  expiresAt  DateTime @map("expires_at") @db.Timestamptz
+  lastSeenAt DateTime @default(now()) @map("last_seen_at") @db.Timestamptz
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz
+  member     Member   @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model Client {
+  id                       String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  workspaceId              String    @map("workspace_id") @db.Uuid
+  name                     String
+  contactName              String    @default("") @map("contact_name")
+  billingEmails            String[]  @default([]) @map("billing_emails")
+  address                  String    @default("")
+  taxId                    String    @default("") @map("tax_id")
+  currency                 String    @db.Char(3)
+  rateMinor                Int?      @map("rate_minor")
+  termsDays                Int?      @map("terms_days")
+  colour                   Int       @default(0)
+  notes                    String    @default("")
+  lineLayout               Json?     @map("line_layout")
+  readyThresholdMinor      Int?      @map("ready_threshold_minor")
+  defaultPaymentAccountId  String?   @map("default_payment_account_id") @db.Uuid
+  archivedAt               DateTime? @map("archived_at") @db.Timestamptz
+  createdAt                DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt                DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+
+  workspace             Workspace       @relation(fields: [workspaceId], references: [id])
+  defaultPaymentAccount PaymentAccount? @relation(fields: [defaultPaymentAccountId], references: [id])
+  projects              Project[]
+  invoices              Invoice[]
+
+  @@index([workspaceId])
+  @@map("clients")
+}
+
+model Project {
+  id          String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  workspaceId String        @map("workspace_id") @db.Uuid
+  clientId    String        @map("client_id") @db.Uuid
+  name        String
+  rateMinor   Int?          @map("rate_minor")
+  budgetKind  BudgetKind?   @map("budget_kind")
+  budgetValue Int?          @map("budget_value")
+  status      ProjectStatus @default(active)
+  notes       String        @default("")
+  createdAt   DateTime      @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt   DateTime      @updatedAt @map("updated_at") @db.Timestamptz
+
+  client Client @relation(fields: [clientId], references: [id])
+  tasks  Task[]
+
+  @@index([workspaceId, clientId])
+  @@map("projects")
+}
+
+model Task {
+  id               String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  workspaceId      String      @map("workspace_id") @db.Uuid
+  projectId        String      @map("project_id") @db.Uuid
+  name             String
+  billingMode      BillingMode @default(hourly) @map("billing_mode")
+  rateMinor        Int?        @map("rate_minor")
+  fixedAmountMinor Int?        @map("fixed_amount_minor")
+  estimateSeconds  Int?        @map("estimate_seconds")
+  doneAt           DateTime?   @map("done_at") @db.Timestamptz
+  position         Int         @default(0)
+  createdAt        DateTime    @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt        DateTime    @updatedAt @map("updated_at") @db.Timestamptz
+
+  project      Project        @relation(fields: [projectId], references: [id])
+  timeEntries  TimeEntry[]
+  invoiceLines InvoiceLine[]
+
+  @@index([workspaceId, projectId])
+  @@map("tasks")
+}
+
+model TimeEntry {
+  id              String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  workspaceId     String          @map("workspace_id") @db.Uuid
+  memberId        String          @map("member_id") @db.Uuid
+  taskId          String?         @map("task_id") @db.Uuid
+  state           TimeEntryState  @default(stopped)
+  timeZone        String          @map("time_zone")
+  date            DateTime        @db.Date
+  startedAt       DateTime?       @map("started_at") @db.Timestamptz
+  endedAt         DateTime?       @map("ended_at") @db.Timestamptz
+  durationSeconds Int             @default(0) @map("duration_seconds")
+  note            String          @default("")
+  billable        Boolean
+  invoiceId       String?         @map("invoice_id") @db.Uuid
+  offInvoice      OffInvoiceKind? @map("off_invoice")
+  offInvoiceRef   String?         @map("off_invoice_ref")
+  offInvoiceNote  String?         @map("off_invoice_note")
+  version         Int             @default(1)
+  deletedAt       DateTime?       @map("deleted_at") @db.Timestamptz
+  createdAt       DateTime        @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt       DateTime        @updatedAt @map("updated_at") @db.Timestamptz
+
+  member      Member              @relation(fields: [memberId], references: [id])
+  task        Task?               @relation(fields: [taskId], references: [id])
+  invoice     Invoice?            @relation(fields: [invoiceId], references: [id])
+  segments    TimeEntrySegment[]
+  lineEntries InvoiceLineEntry[]
+  changes     InvoiceEntryChange[]
+
+  @@index([workspaceId, memberId, date])
+  @@map("time_entries")
+}
+
+model TimeEntrySegment {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  workspaceId String    @map("workspace_id") @db.Uuid
+  timeEntryId String    @map("time_entry_id") @db.Uuid
+  startedAt   DateTime  @map("started_at") @db.Timestamptz
+  endedAt     DateTime? @map("ended_at") @db.Timestamptz
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  timeEntry   TimeEntry @relation(fields: [timeEntryId], references: [id], onDelete: Cascade)
+
+  @@index([timeEntryId])
+  @@map("time_entry_segments")
+}
+
+model PaymentAccount {
+  id                    String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  workspaceId           String    @map("workspace_id") @db.Uuid
+  currency              String    @db.Char(3)
+  label                 String
+  beneficiaryName       String    @default("") @map("beneficiary_name")
+  beneficiaryAddress    String    @default("") @map("beneficiary_address")
+  bankName              String    @default("") @map("bank_name")
+  bankAddress           String    @default("") @map("bank_address")
+  accountNumber         String?   @map("account_number")
+  iban                  String?
+  swiftBic              String?   @map("swift_bic")
+  routingNumber         String?   @map("routing_number")
+  correspondentBankName String?   @map("correspondent_bank_name")
+  correspondentAccount  String?   @map("correspondent_account")
+  correspondentSwift    String?   @map("correspondent_swift")
+  referenceHint         String?   @map("reference_hint")
+  instructions          String?
+  isDefault             Boolean   @default(false) @map("is_default")
+  archivedAt            DateTime? @map("archived_at") @db.Timestamptz
+  createdAt             DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt             DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id])
+  clients   Client[]
+
+  @@map("payment_accounts")
+}
+
+model InvoiceSequence {
+  workspaceId String    @map("workspace_id") @db.Uuid
+  period      String    @default("")
+  nextSeq     Int       @map("next_seq")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id])
+
+  @@id([workspaceId, period])
+  @@map("invoice_sequences")
+}
+
+model Invoice {
+  id               String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  workspaceId      String        @map("workspace_id") @db.Uuid
+  clientId         String        @map("client_id") @db.Uuid
+  status           InvoiceStatus @default(draft)
+  number           String?
+  numberSeq        Int?          @map("number_seq")
+  numberPeriod     String?       @map("number_period")
+  currency         String        @db.Char(3)
+  currentVersionId String?       @unique @map("current_version_id") @db.Uuid
+  publicToken      String        @unique @map("public_token")
+  source           InvoiceSource @default(paypure)
+  voidedAt         DateTime?     @map("voided_at") @db.Timestamptz
+  voidedBy         String?       @map("voided_by") @db.Uuid
+  voidReason       String?       @map("void_reason")
+  createdAt        DateTime      @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt        DateTime      @updatedAt @map("updated_at") @db.Timestamptz
+
+  client         Client            @relation(fields: [clientId], references: [id])
+  currentVersion InvoiceVersion?   @relation("CurrentVersion", fields: [currentVersionId], references: [id])
+  versions       InvoiceVersion[]  @relation("Versions")
+  payments       Payment[]
+  activity       InvoiceActivity[]
+  emails         OutboundEmail[]
+  claimedEntries TimeEntry[]
+
+  @@unique([workspaceId, number])
+  @@unique([workspaceId, numberPeriod, numberSeq])
+  @@index([workspaceId, status])
+  @@map("invoices")
+}
+
+model InvoiceVersion {
+  id                     String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  invoiceId              String             @map("invoice_id") @db.Uuid
+  rev                    Int
+  frozenAt               DateTime?          @map("frozen_at") @db.Timestamptz
+  frozenBy               String?            @map("frozen_by") @db.Uuid
+  issueDate              DateTime?          @map("issue_date") @db.Date
+  dueDate                DateTime?          @map("due_date") @db.Date
+  dueDateManual          Boolean            @default(false) @map("due_date_manual")
+  termsDays              Int                @map("terms_days")
+  summary                String             @default("")
+  notes                  String             @default("")
+  fromSnapshot           Json?              @map("from_snapshot")
+  toSnapshot             Json?              @map("to_snapshot")
+  paymentAccountMode     PaymentAccountMode @default(default) @map("payment_account_mode")
+  paymentAccountId       String?            @map("payment_account_id") @db.Uuid
+  paymentAccountSnapshot Json?              @map("payment_account_snapshot")
+  lineLayout             Json               @map("line_layout")
+  subtotal               Int?
+  discountTotal          Int?               @map("discount_total")
+  taxTotal               Int?               @map("tax_total")
+  total                  Int?
+  changeSummary          String?            @map("change_summary")
+  contentHash            String?            @map("content_hash")
+  templateVersion        String?            @map("template_version")
+  createdAt              DateTime           @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt              DateTime           @updatedAt @map("updated_at") @db.Timestamptz
+
+  invoice       Invoice              @relation("Versions", fields: [invoiceId], references: [id], onDelete: Cascade)
+  currentOf     Invoice?             @relation("CurrentVersion")
+  lines         InvoiceLine[]
+  taxes         InvoiceVersionTax[]
+  entryChanges  InvoiceEntryChange[]
+  file          InvoiceFile?
+
+  @@unique([invoiceId, rev])
+  @@map("invoice_versions")
+}
+
+model InvoiceLine {
+  id                String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  versionId         String         @map("version_id") @db.Uuid
+  position          Int
+  kind              LineKind
+  title             String
+  detail            String         @default("")
+  qtyHundredths     Int            @map("qty_hundredths")
+  unit              String         @default("")
+  rateMinor         Int            @map("rate_minor")
+  amountMinor       Int            @map("amount_minor")
+  discountRateBp    Int?           @map("discount_rate_bp")
+  taskId            String?        @map("task_id") @db.Uuid
+  overrides         Json           @default("[]")
+  sourceFingerprint String?        @map("source_fingerprint")
+  createdAt         DateTime       @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt         DateTime       @updatedAt @map("updated_at") @db.Timestamptz
+
+  version InvoiceVersion     @relation(fields: [versionId], references: [id], onDelete: Cascade)
+  task    Task?              @relation(fields: [taskId], references: [id])
+  taxes   InvoiceLineTax[]
+  entries InvoiceLineEntry[]
+
+  @@index([versionId])
+  @@map("invoice_lines")
+}
+
+model InvoiceVersionTax {
+  id        String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  versionId String           @map("version_id") @db.Uuid
+  name      String
+  rateBp    Int              @map("rate_bp")
+  position  Int              @default(0)
+  version   InvoiceVersion   @relation(fields: [versionId], references: [id], onDelete: Cascade)
+  lines     InvoiceLineTax[]
+
+  @@map("invoice_version_taxes")
+}
+
+model InvoiceLineTax {
+  lineId       String            @map("line_id") @db.Uuid
+  versionTaxId String            @map("version_tax_id") @db.Uuid
+  line         InvoiceLine       @relation(fields: [lineId], references: [id], onDelete: Cascade)
+  versionTax   InvoiceVersionTax @relation(fields: [versionTaxId], references: [id], onDelete: Cascade)
+
+  @@id([lineId, versionTaxId])
+  @@map("invoice_line_taxes")
+}
+
+model InvoiceLineEntry {
+  lineId      String      @map("line_id") @db.Uuid
+  timeEntryId String      @map("time_entry_id") @db.Uuid
+  seconds     Int
+  line        InvoiceLine @relation(fields: [lineId], references: [id], onDelete: Cascade)
+  timeEntry   TimeEntry   @relation(fields: [timeEntryId], references: [id])
+
+  @@id([lineId, timeEntryId])
+  @@index([timeEntryId])
+  @@map("invoice_line_entries")
+}
+
+model InvoiceEntryChange {
+  id          String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  versionId   String         @map("version_id") @db.Uuid
+  timeEntryId String         @map("time_entry_id") @db.Uuid
+  op          String
+  changes     Json
+  segments    Json?
+  createdAt   DateTime       @default(now()) @map("created_at") @db.Timestamptz
+  version     InvoiceVersion @relation(fields: [versionId], references: [id], onDelete: Cascade)
+  timeEntry   TimeEntry      @relation(fields: [timeEntryId], references: [id])
+
+  @@unique([versionId, timeEntryId])
+  @@map("invoice_entry_changes")
+}
+
+model InvoiceFile {
+  versionId       String         @id @map("version_id") @db.Uuid
+  kind            String         @default("rendered")
+  pdf             Bytes
+  sha256          String
+  bytes           Int
+  templateVersion String         @map("template_version")
+  renderedAt      DateTime       @default(now()) @map("rendered_at") @db.Timestamptz
+  version         InvoiceVersion @relation(fields: [versionId], references: [id])
+
+  @@map("invoice_files")
+}
+
+model Payment {
+  id         String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  invoiceId  String      @map("invoice_id") @db.Uuid
+  kind       PaymentKind @default(payment)
+  amount     Int
+  receivedOn DateTime    @map("received_on") @db.Date
+  method     String      @default("bank_transfer")
+  note       String      @default("")
+  createdBy  String      @map("created_by") @db.Uuid
+  deletedAt  DateTime?   @map("deleted_at") @db.Timestamptz
+  deletedBy  String?     @map("deleted_by") @db.Uuid
+  createdAt  DateTime    @default(now()) @map("created_at") @db.Timestamptz
+  invoice    Invoice     @relation(fields: [invoiceId], references: [id])
+
+  @@index([invoiceId])
+  @@map("payments")
+}
+
+model InvoiceActivity {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  invoiceId String   @map("invoice_id") @db.Uuid
+  versionId String?  @map("version_id") @db.Uuid
+  kind      String
+  actor     String
+  actorId   String?  @map("actor_id") @db.Uuid
+  data      Json     @default("{}")
+  at        DateTime @default(now()) @db.Timestamptz
+  invoice   Invoice  @relation(fields: [invoiceId], references: [id])
+
+  @@index([invoiceId, at])
+  @@map("invoice_activity")
+}
+
+model OutboundEmail {
+  id             String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  workspaceId    String      @map("workspace_id") @db.Uuid
+  invoiceId      String?     @map("invoice_id") @db.Uuid
+  versionId      String?     @map("version_id") @db.Uuid
+  kind           EmailKind
+  idempotencyKey String      @unique @map("idempotency_key")
+  from           String
+  replyTo        String      @default("") @map("reply_to")
+  to             String[]
+  cc             String[]    @default([])
+  subject        String
+  textBody       String      @map("text_body")
+  htmlBody       String      @map("html_body")
+  attachments    Json        @default("[]")
+  status         EmailStatus @default(queued)
+  attempts       Int         @default(0)
+  lastError      String?     @map("last_error")
+  transport      String?
+  messageId      String?     @map("message_id")
+  queuedAt       DateTime    @default(now()) @map("queued_at") @db.Timestamptz
+  sentAt         DateTime?   @map("sent_at") @db.Timestamptz
+  createdBy      String?     @map("created_by") @db.Uuid
+  invoice        Invoice?    @relation(fields: [invoiceId], references: [id])
+
+  @@index([status])
+  @@map("outbound_emails")
+}
