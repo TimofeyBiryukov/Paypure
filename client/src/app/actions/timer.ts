@@ -6,7 +6,15 @@ import { type ActionState, run, str } from "@/lib/action";
 import type { TimerSnapshot } from "@/lib/types";
 import { api } from "@/server/api";
 
-type Snap = { entry: TimerSnapshot | null; applied: boolean; needsTask?: boolean; newDay?: boolean; stopped?: { id: string; seconds: number; prevState: string }; stoppedEntryId?: string | null; stoppedPrevState?: string | null };
+type Snap = {
+  entry: TimerSnapshot | null;
+  applied: boolean;
+  needsTask?: boolean;
+  newDay?: boolean;
+  stopped?: { id: string; seconds: number; prevState: string };
+  stoppedEntryId?: string | null;
+  stoppedPrevState?: string | null;
+};
 
 const label = (e: TimerSnapshot | null) => (e?.task ? `${e.task.clientName} · ${e.task.name}` : "");
 
@@ -27,7 +35,14 @@ export async function startTimer(_: ActionState, fd: FormData): Promise<ActionSt
       toast: r.stoppedEntryId
         ? {
             text: `Stopped the previous timer. Started ${label(r.entry) || "a timer"}`,
-            undo: { action: "restoreTimer", payload: { id: r.stoppedEntryId, state: r.stoppedPrevState ?? "running", discardId: r.entry?.id ?? "" } },
+            undo: {
+              action: "restoreTimer",
+              payload: {
+                id: r.stoppedEntryId,
+                state: r.stoppedPrevState ?? "running",
+                discardId: r.entry?.id ?? "",
+              },
+            },
           }
         : undefined,
     };
@@ -42,7 +57,14 @@ export async function timerTransition(_: ActionState, fd: FormData): Promise<Act
     const r = await api<Snap>(`/v1/timer/${id}/${op}`, { body: {} });
     revalidatePath("/", "layout");
     if (!r.applied) {
-      return { data: { timer: r.entry }, toast: { text: r.entry ? `Already ${r.entry.state} on another device` : "Already stopped on another device" } };
+      return {
+        data: { timer: r.entry },
+        toast: {
+          text: r.entry
+            ? `Already ${r.entry.state} on another device`
+            : "Already stopped on another device",
+        },
+      };
     }
     if (op === "stop" && r.needsTask) {
       return { data: { timer: r.entry, needsTask: true } };
@@ -52,16 +74,25 @@ export async function timerTransition(_: ActionState, fd: FormData): Promise<Act
         data: { timer: null },
         toast: {
           text: `Logged ${formatDuration(r.stopped.seconds, { withSeconds: r.stopped.seconds < 60 })}`,
-          undo: { action: "restoreTimer", payload: { id: r.stopped.id, state: r.stopped.prevState } },
+          undo: {
+            action: "restoreTimer",
+            payload: { id: r.stopped.id, state: r.stopped.prevState },
+          },
           link: { href: `/time?view=day&edit=${r.stopped.id}`, label: "Edit" },
         },
       };
     }
     if (op === "discard") {
-      return { data: { timer: null }, toast: { text: "Timer discarded", undo: { action: "restoreTimer", payload: { id } } } };
+      return {
+        data: { timer: null },
+        toast: { text: "Timer discarded", undo: { action: "restoreTimer", payload: { id } } },
+      };
     }
     if (op === "resume" && r.newDay) {
-      return { data: { timer: r.entry }, toast: { text: "Started a new entry for today. Yesterday's entry was kept." } };
+      return {
+        data: { timer: r.entry },
+        toast: { text: "Started a new entry for today. Yesterday's entry was kept." },
+      };
     }
     return { data: { timer: r.entry } };
   });
@@ -76,7 +107,9 @@ export async function updateTimer(_: ActionState, fd: FormData): Promise<ActionS
     if (fd.has("billableField")) body.billable = fd.get("billable") === "on";
     const nudge = str(fd, "nudge");
     if (nudge && str(fd, "firstStartedAt")) {
-      body.startedAt = new Date(new Date(str(fd, "firstStartedAt")).getTime() + Number(nudge) * 60000).toISOString();
+      body.startedAt = new Date(
+        new Date(str(fd, "firstStartedAt")).getTime() + Number(nudge) * 60000,
+      ).toISOString();
     }
     if (str(fd, "startedAtWall")) body.startedAt = str(fd, "startedAtWall");
     const r = await api<Snap>(`/v1/timer/${id}`, { method: "PATCH", body });
@@ -86,7 +119,12 @@ export async function updateTimer(_: ActionState, fd: FormData): Promise<ActionS
       revalidatePath("/", "layout");
       return {
         data: { timer: null },
-        toast: s.stopped ? { text: `Logged ${formatDuration(s.stopped.seconds)}`, undo: { action: "restoreTimer", payload: { id, state: "paused" } } } : undefined,
+        toast: s.stopped
+          ? {
+              text: `Logged ${formatDuration(s.stopped.seconds)}`,
+              undo: { action: "restoreTimer", payload: { id, state: "paused" } },
+            }
+          : undefined,
       };
     }
     revalidatePath("/", "layout");

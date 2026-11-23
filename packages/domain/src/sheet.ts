@@ -90,7 +90,10 @@ export function sheetFromLines(
   taxes: { id: string; name: string; rateBp: number }[],
 ): Pick<SheetData, "lines" | "taxes" | "subtotalMinor" | "totalMinor"> & { errors: string[] } {
   // The discount line always sits last above the subtotal (07 §7.2).
-  const ordered = [...lines.filter((l) => l.kind !== "discount"), ...lines.filter((l) => l.kind === "discount")];
+  const ordered = [
+    ...lines.filter((l) => l.kind !== "discount"),
+    ...lines.filter((l) => l.kind === "discount"),
+  ];
   const c = computeInvoice(ordered, taxes);
   return {
     lines: ordered.map((l, i) => ({

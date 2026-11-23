@@ -1,4 +1,11 @@
-import { type ChipTone, daysBetween, formatDateLong, formatMoney, type SheetData, todayIn } from "@paypure/domain";
+import {
+  type ChipTone,
+  daysBetween,
+  formatDateLong,
+  formatMoney,
+  type SheetData,
+  todayIn,
+} from "@paypure/domain";
 import { FileDown } from "lucide-react";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
@@ -24,7 +31,7 @@ import { Submit } from "@/components/submit";
 import { ActionForm } from "@/components/toaster";
 import { ClientBadge, PageHeader, StatusChip } from "@/components/ui";
 import { UrlDialog } from "@/components/url-dialog";
-import { api, ApiError, getMe } from "@/server/api";
+import { ApiError, api, getMe } from "@/server/api";
 
 export const metadata = { title: "Invoice" };
 
@@ -36,16 +43,71 @@ interface Inv {
   currency: string;
   publicUrl: string;
   client: { id: string; name: string; colour: number; billingEmails: string[] };
-  display: { key: string; label: string; tone: ChipTone; balanceMinor: number; overpaidMinor?: number; overdueDays?: number };
+  display: {
+    key: string;
+    label: string;
+    tone: ChipTone;
+    balanceMinor: number;
+    overpaidMinor?: number;
+    overdueDays?: number;
+  };
   totalMinor: number;
   netPaidMinor: number;
   claimedEntries: number;
-  currentVersion: { id: string; rev: number; sheet: SheetData; changeSummary: string | null } | null;
-  open: (OpenVersion & { staged: { entryId: string; op: string; changes: Record<string, [unknown, unknown]>; taskName: string; date: string | null }[] }) | null;
-  versions: { id: string; rev: number; frozenAt: string; changeSummary: string | null; total: number }[];
-  payments: { id: string; kind: "payment" | "refund"; amountMinor: number; receivedOn: string; method: string; note: string; deleted: boolean }[];
-  activity: { id: string; kind: string; actor: string; data: Record<string, unknown>; at: string }[];
-  emails: { id: string; kind: string; to: string[]; cc: string[]; subject: string; textBody: string; status: string; attempts: number; lastError: string | null; attachments: { name: string; bytes: number; sha256: string }[]; queuedAt: string; sentAt: string | null }[];
+  currentVersion: {
+    id: string;
+    rev: number;
+    sheet: SheetData;
+    changeSummary: string | null;
+  } | null;
+  open:
+    | (OpenVersion & {
+        staged: {
+          entryId: string;
+          op: string;
+          changes: Record<string, [unknown, unknown]>;
+          taskName: string;
+          date: string | null;
+        }[];
+      })
+    | null;
+  versions: {
+    id: string;
+    rev: number;
+    frozenAt: string;
+    changeSummary: string | null;
+    total: number;
+  }[];
+  payments: {
+    id: string;
+    kind: "payment" | "refund";
+    amountMinor: number;
+    receivedOn: string;
+    method: string;
+    note: string;
+    deleted: boolean;
+  }[];
+  activity: {
+    id: string;
+    kind: string;
+    actor: string;
+    data: Record<string, unknown>;
+    at: string;
+  }[];
+  emails: {
+    id: string;
+    kind: string;
+    to: string[];
+    cc: string[];
+    subject: string;
+    textBody: string;
+    status: string;
+    attempts: number;
+    lastError: string | null;
+    attachments: { name: string; bytes: number; sha256: string }[];
+    queuedAt: string;
+    sentAt: string | null;
+  }[];
   accounts: { id: string; label: string; bankName: string; last4: string; isDefault: boolean }[];
   canVoid: boolean;
 }
@@ -74,11 +136,28 @@ const ACTIVITY: Record<string, string> = {
 };
 
 function when(iso: string) {
-  return new Date(iso).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+  return new Date(iso).toLocaleString("en-GB", {
+    day: "numeric",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
 
 /** Invoice (S11): one route, edit mode for drafts and corrections, view mode once sent. */
-export default async function InvoicePage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ send?: string; pay?: string; void?: string; copied?: string; email?: string }> }) {
+export default async function InvoicePage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{
+    send?: string;
+    pay?: string;
+    void?: string;
+    copied?: string;
+    email?: string;
+  }>;
+}) {
   const me = (await getMe())!;
   if (!me.isAdmin) redirect("/");
   const { id } = await params;
@@ -92,14 +171,20 @@ export default async function InvoicePage({ params, searchParams }: { params: Pr
   }
   const today = todayIn(me.workspace.timeZone);
   const m = (n: number) => formatMoney({ minor: n, currency: inv.currency });
-  const sendKind = sp.send === "correction" || sp.send === "reminder" || sp.send === "invoice" ? sp.send : null;
-  const preview = sendKind ? await api<EmailPreview>(`/v1/invoices/${id}/email?kind=${sendKind}`) : null;
+  const sendKind =
+    sp.send === "correction" || sp.send === "reminder" || sp.send === "invoice" ? sp.send : null;
+  const preview = sendKind
+    ? await api<EmailPreview>(`/v1/invoices/${id}/email?kind=${sendKind}`)
+    : null;
   const isDraft = inv.status === "draft";
   const correction = inv.status === "issued" && inv.open;
   const title = inv.number ?? `Draft · ${inv.client.name}`;
   const outdated = inv.open?.lines.filter((l) => l.outdated).length ?? 0;
   const balance = inv.display.balanceMinor;
-  const prefilled = correction && inv.currentVersion ? `Total ${m(inv.currentVersion.sheet.totalMinor)} → ${m(inv.open?.sheet.totalMinor ?? 0)}` : "";
+  const prefilled =
+    correction && inv.currentVersion
+      ? `Total ${m(inv.currentVersion.sheet.totalMinor)} → ${m(inv.open?.sheet.totalMinor ?? 0)}`
+      : "";
   const hidden = <input type="hidden" name="invoiceId" value={inv.id} />;
 
   const primary = isDraft ? (
@@ -129,23 +214,42 @@ export default async function InvoicePage({ params, searchParams }: { params: Pr
     <div>
       <PageHeader
         crumbs={[{ href: "/invoices", label: "Invoices" }]}
-        title={<span className={inv.status === "void" ? "line-through text-muted" : ""}>{title}</span>}
+        title={
+          <span className={inv.status === "void" ? "line-through text-muted" : ""}>{title}</span>
+        }
         chip={
           <>
-            <StatusChip label={inv.display.label} tone={inv.display.tone} note={inv.display.overpaidMinor ? `overpaid ${m(inv.display.overpaidMinor)}` : undefined} />
-            {(inv.currentVersion?.rev ?? 1) > 1 && <span className="t-caption">rev {inv.currentVersion?.rev}</span>}
+            <StatusChip
+              label={inv.display.label}
+              tone={inv.display.tone}
+              note={
+                inv.display.overpaidMinor ? `overpaid ${m(inv.display.overpaidMinor)}` : undefined
+              }
+            />
+            {(inv.currentVersion?.rev ?? 1) > 1 && (
+              <span className="t-caption">rev {inv.currentVersion?.rev}</span>
+            )}
           </>
         }
         sub={
-          <Link href={`/clients/${inv.client.id}`} className="inline-flex items-center gap-2 hover:text-ink">
-            <ClientBadge name={inv.client.name} colour={inv.client.colour} size={20} /> {inv.client.name}
+          <Link
+            href={`/clients/${inv.client.id}`}
+            className="inline-flex items-center gap-2 hover:text-ink"
+          >
+            <ClientBadge name={inv.client.name} colour={inv.client.colour} size={20} />{" "}
+            {inv.client.name}
           </Link>
         }
         actions={
           <>
             {!isDraft && (
               <>
-                <a href={`/invoices/${inv.id}/pdf`} className="btn btn-secondary" target="_blank" rel="noreferrer">
+                <a
+                  href={`/invoices/${inv.id}/pdf`}
+                  className="btn btn-secondary"
+                  target="_blank"
+                  rel="noreferrer"
+                >
                   <FileDown size={14} /> PDF
                 </a>
                 <CopyButton text={inv.publicUrl} label="Copy link" />
@@ -197,7 +301,10 @@ export default async function InvoicePage({ params, searchParams }: { params: Pr
                   </button>
                 </ActionForm>
                 {!isDraft && (
-                  <Link href={`/time?view=list&invoice=${inv.id}&member=all&from=2000-01-01`} className="menu-item">
+                  <Link
+                    href={`/time?view=list&invoice=${inv.id}&member=all&from=2000-01-01`}
+                    className="menu-item"
+                  >
                     View billed time
                   </Link>
                 )}
@@ -215,7 +322,10 @@ export default async function InvoicePage({ params, searchParams }: { params: Pr
                       Void…
                     </Link>
                   ) : (
-                    <span className="menu-item text-faint" title="Refund or remove the payments first, or correct the invoice instead.">
+                    <span
+                      className="menu-item text-faint"
+                      title="Refund or remove the payments first, or correct the invoice instead."
+                    >
                       Void… (has payments)
                     </span>
                   ))}
@@ -234,8 +344,17 @@ export default async function InvoicePage({ params, searchParams }: { params: Pr
         }
       />
 
-      {sp.copied && isDraft && <div className="banner mb-4 text-sm">Copied as fixed lines. Remove them and add unbilled time from the builder if this should bill tracked time.</div>}
-      {inv.status === "void" && <div className="banner banner-danger mb-4 text-sm">This invoice was voided. Its number stays in your sequence.</div>}
+      {sp.copied && isDraft && (
+        <div className="banner mb-4 text-sm">
+          Copied as fixed lines. Remove them and add unbilled time from the builder if this should
+          bill tracked time.
+        </div>
+      )}
+      {inv.status === "void" && (
+        <div className="banner banner-danger mb-4 text-sm">
+          This invoice was voided. Its number stays in your sequence.
+        </div>
+      )}
       {inv.status === "issued" && !correction && (
         <div className="banner mb-4 text-sm">
           <span>Sent invoices can't be edited.</span>
@@ -256,31 +375,46 @@ export default async function InvoicePage({ params, searchParams }: { params: Pr
             </h2>
             <ActionForm action={refreshDetails} className="ml-auto">
               {hidden}
-              <Submit className="btn btn-ghost btn-sm">Refresh client, business and payment details</Submit>
+              <Submit className="btn btn-ghost btn-sm">
+                Refresh client, business and payment details
+              </Submit>
             </ActionForm>
           </div>
           {inv.open.staged.length > 0 && (
             <div>
               <p className="font-medium">
-                {inv.open.staged.length} {inv.open.staged.length === 1 ? "change" : "changes"} pending from billed time
+                {inv.open.staged.length} {inv.open.staged.length === 1 ? "change" : "changes"}{" "}
+                pending from billed time
               </p>
               <ul className="text-sm text-muted list-disc pl-5">
                 {inv.open.staged.map((s) => (
                   <li key={s.entryId}>
-                    {s.date} · {s.taskName}: {Object.keys(s.changes).join(", ")} {s.op === "move" ? "(moved)" : ""}
+                    {s.date} · {s.taskName}: {Object.keys(s.changes).join(", ")}{" "}
+                    {s.op === "move" ? "(moved)" : ""}
                   </li>
                 ))}
               </ul>
-              <p className="t-caption">Staged changes are applied to the time entries when you approve this correction.</p>
+              <p className="t-caption">
+                Staged changes are applied to the time entries when you approve this correction.
+              </p>
             </div>
           )}
-          <ActionForm action={saveCorrectionWithoutSending} className="flex flex-col sm:flex-row gap-2 sm:items-end">
+          <ActionForm
+            action={saveCorrectionWithoutSending}
+            className="flex flex-col sm:flex-row gap-2 sm:items-end"
+          >
             {hidden}
             <div className="flex-1">
               <label className="label" htmlFor="cs">
                 What changed (required)
               </label>
-              <input id="cs" name="changeSummary" className="input" required defaultValue={prefilled} />
+              <input
+                id="cs"
+                name="changeSummary"
+                className="input"
+                required
+                defaultValue={prefilled}
+              />
             </div>
             <Submit className="btn btn-secondary">Save without sending</Submit>
           </ActionForm>
@@ -305,7 +439,10 @@ export default async function InvoicePage({ params, searchParams }: { params: Pr
         <DraftEditor
           // Remount only when the server changed the lines (Update, time claimed or released), never
           // after our own autosave: the save response already hands back the new ids.
-          key={`${inv.open.id}:${inv.open.lines.filter((l) => l.outdated).map((l) => l.id).join(",")}:${inv.open.lines.reduce((s, l) => s + l.entryCount, 0)}`}
+          key={`${inv.open.id}:${inv.open.lines
+            .filter((l) => l.outdated)
+            .map((l) => l.id)
+            .join(",")}:${inv.open.lines.reduce((s, l) => s + l.entryCount, 0)}`}
           invoiceId={inv.id}
           currency={inv.currency}
           open={inv.open}
@@ -316,7 +453,9 @@ export default async function InvoicePage({ params, searchParams }: { params: Pr
         />
       ) : (
         <div className="grid xl:grid-cols-[1fr_320px] gap-6 items-start">
-          <div className="overflow-x-auto">{inv.currentVersion && <InvoiceSheet s={inv.currentVersion.sheet} />}</div>
+          <div className="overflow-x-auto">
+            {inv.currentVersion && <InvoiceSheet s={inv.currentVersion.sheet} />}
+          </div>
           <aside className="space-y-4">
             <section className="card p-5 text-sm">
               <dl className="space-y-1">
@@ -334,29 +473,42 @@ export default async function InvoicePage({ params, searchParams }: { params: Pr
                 </div>
               </dl>
               {inv.currentVersion?.sheet.dueDate && inv.status === "issued" && (
-                <p className={`mt-2 ${inv.display.key === "overdue" ? "text-danger" : "text-muted"}`}>
+                <p
+                  className={`mt-2 ${inv.display.key === "overdue" ? "text-danger" : "text-muted"}`}
+                >
                   Due {formatDateLong(inv.currentVersion.sheet.dueDate)}
-                  {inv.display.key === "overdue" ? ` · ${daysBetween(inv.currentVersion.sheet.dueDate, today)} days ago` : ""}
+                  {inv.display.key === "overdue"
+                    ? ` · ${daysBetween(inv.currentVersion.sheet.dueDate, today)} days ago`
+                    : ""}
                 </p>
               )}
             </section>
             <section className="card p-5 text-sm">
               <h3 className="font-semibold mb-2">Payments</h3>
-              {inv.payments.filter((p) => !p.deleted).length === 0 && <p className="text-muted">None yet.</p>}
+              {inv.payments.filter((p) => !p.deleted).length === 0 && (
+                <p className="text-muted">None yet.</p>
+              )}
               <ul className="space-y-1">
                 {inv.payments
                   .filter((p) => !p.deleted)
                   .map((p) => (
                     <li key={p.id} className="flex items-center gap-2">
-                      <span className="text-muted w-20">{formatDateLong(p.receivedOn).replace(/ \d{4}$/, "")}</span>
+                      <span className="text-muted w-20">
+                        {formatDateLong(p.receivedOn).replace(/ \d{4}$/, "")}
+                      </span>
                       <span className="tnum flex-1">
                         {p.kind === "refund" ? "−" : ""}
-                        {m(p.amountMinor)} <span className="text-muted">{p.method.replace("_", " ")}</span>
+                        {m(p.amountMinor)}{" "}
+                        <span className="text-muted">{p.method.replace("_", " ")}</span>
                       </span>
                       <ActionForm action={removePayment} showError={false}>
                         {hidden}
                         <input type="hidden" name="paymentId" value={p.id} />
-                        <button type="submit" className="btn btn-ghost btn-sm" aria-label="Remove payment">
+                        <button
+                          type="submit"
+                          className="btn btn-ghost btn-sm"
+                          aria-label="Remove payment"
+                        >
                           ✕
                         </button>
                       </ActionForm>
@@ -370,7 +522,12 @@ export default async function InvoicePage({ params, searchParams }: { params: Pr
                 <ul className="space-y-2">
                   {inv.versions.map((v) => (
                     <li key={v.id}>
-                      <a href={`/invoices/${inv.id}/pdf?version=${v.id}`} target="_blank" rel="noreferrer" className="text-accent font-medium">
+                      <a
+                        href={`/invoices/${inv.id}/pdf?version=${v.id}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-accent font-medium"
+                      >
                         Revision {v.rev}
                       </a>{" "}
                       <span className="text-muted">
@@ -396,20 +553,40 @@ export default async function InvoicePage({ params, searchParams }: { params: Pr
                 <li key={a.id}>
                   <span className="font-medium">{ACTIVITY[a.kind] ?? a.kind}</span>
                   {a.kind === "note" && <span>: {String(a.data.text)}</span>}
-                  {Array.isArray(a.data.to) && <span> to {(a.data.to as string[]).join(", ")}</span>}
-                  {typeof a.data.amountMinor === "number" && <span className="tnum"> · {m(a.data.amountMinor)}</span>}
-                  {typeof a.data.changeSummary === "string" && <span className="text-muted"> · {a.data.changeSummary}</span>}
-                  {a.kind === "viewed" && typeof a.data.rev === "number" && <span className="text-muted"> · rev {a.data.rev}</span>}
+                  {Array.isArray(a.data.to) && (
+                    <span> to {(a.data.to as string[]).join(", ")}</span>
+                  )}
+                  {typeof a.data.amountMinor === "number" && (
+                    <span className="tnum"> · {m(a.data.amountMinor)}</span>
+                  )}
+                  {typeof a.data.changeSummary === "string" && (
+                    <span className="text-muted"> · {a.data.changeSummary}</span>
+                  )}
+                  {a.kind === "viewed" && typeof a.data.rev === "number" && (
+                    <span className="text-muted"> · rev {a.data.rev}</span>
+                  )}
                   <span className="text-muted"> · {when(a.at)}</span>
                   {email && (
                     <details className="mt-1 ml-4">
                       <summary className="cursor-pointer text-accent">
-                        {email.status === "sent" ? "Sent" : email.status === "failed" ? "Failed" : email.status === "waiting_for_pdf" ? "Waiting for PDF" : "Queued"} · view email
+                        {email.status === "sent"
+                          ? "Sent"
+                          : email.status === "failed"
+                            ? "Failed"
+                            : email.status === "waiting_for_pdf"
+                              ? "Waiting for PDF"
+                              : "Queued"}{" "}
+                        · view email
                       </summary>
                       <div className="mt-2 p-3 bg-sunken rounded-md space-y-1">
                         <div>
                           <b>To</b> {email.to.join(", ")}
-                          {email.cc.length > 0 && <> · <b>Cc</b> {email.cc.join(", ")}</>}
+                          {email.cc.length > 0 && (
+                            <>
+                              {" "}
+                              · <b>Cc</b> {email.cc.join(", ")}
+                            </>
+                          )}
                         </div>
                         <div>
                           <b>Subject</b> {email.subject}
@@ -417,10 +594,13 @@ export default async function InvoicePage({ params, searchParams }: { params: Pr
                         <pre className="whitespace-pre-wrap font-sans">{email.textBody}</pre>
                         {email.attachments.map((at) => (
                           <div key={at.sha256} className="t-caption">
-                            📎 {at.name} · {Math.round(at.bytes / 1024)} KB · sha256 {at.sha256.slice(0, 12)}…
+                            📎 {at.name} · {Math.round(at.bytes / 1024)} KB · sha256{" "}
+                            {at.sha256.slice(0, 12)}…
                           </div>
                         ))}
-                        {email.lastError && email.status !== "sent" && <div className="text-danger">{email.lastError}</div>}
+                        {email.lastError && email.status !== "sent" && (
+                          <div className="text-danger">{email.lastError}</div>
+                        )}
                         {email.status === "failed" && (
                           <ActionForm action={retryEmail}>
                             {hidden}
@@ -447,13 +627,41 @@ export default async function InvoicePage({ params, searchParams }: { params: Pr
       )}
 
       {preview && (
-        <UrlDialog param="send" title={preview.kind === "correction" ? `Send correction to ${inv.number}` : preview.kind === "reminder" ? `Send reminder for ${inv.number}` : isDraft ? "Send invoice" : `Resend ${inv.number}`}>
-          <SendForm invoiceId={inv.id} clientId={inv.client.id} preview={preview} isFirst={isDraft} changeSummary={prefilled} today={today} />
+        <UrlDialog
+          param="send"
+          title={
+            preview.kind === "correction"
+              ? `Send correction to ${inv.number}`
+              : preview.kind === "reminder"
+                ? `Send reminder for ${inv.number}`
+                : isDraft
+                  ? "Send invoice"
+                  : `Resend ${inv.number}`
+          }
+        >
+          <SendForm
+            invoiceId={inv.id}
+            clientId={inv.client.id}
+            preview={preview}
+            isFirst={isDraft}
+            changeSummary={prefilled}
+            today={today}
+          />
         </UrlDialog>
       )}
       {sp.pay && inv.status === "issued" && (
-        <UrlDialog param="pay" title={sp.pay === "refund" ? "Record refund" : "Record payment"} variant="panel">
-          <PaymentForm invoiceId={inv.id} currency={inv.currency} balanceMinor={balance} today={today} refund={sp.pay === "refund"} />
+        <UrlDialog
+          param="pay"
+          title={sp.pay === "refund" ? "Record refund" : "Record payment"}
+          variant="panel"
+        >
+          <PaymentForm
+            invoiceId={inv.id}
+            currency={inv.currency}
+            balanceMinor={balance}
+            today={today}
+            refund={sp.pay === "refund"}
+          />
         </UrlDialog>
       )}
       {sp.void && inv.canVoid && (

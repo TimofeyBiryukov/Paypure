@@ -16,7 +16,8 @@ export async function GET(request: Request) {
     signal: ctrl.signal,
     cache: "no-store",
   }).catch(() => null);
-  if (!upstream?.ok || !upstream.body) return new Response("Unauthorized", { status: upstream?.status ?? 502 });
+  if (!upstream?.ok || !upstream.body)
+    return new Response("Unauthorized", { status: upstream?.status ?? 502 });
   return new Response(upstream.body, {
     headers: {
       "Content-Type": "text/event-stream",

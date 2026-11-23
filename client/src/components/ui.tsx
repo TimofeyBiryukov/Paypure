@@ -1,7 +1,15 @@
 import { type ChipTone, formatMoney, type Money as M, parseNote } from "@paypure/domain";
 import Link from "next/link";
 
-export function StatusChip({ label, tone, note }: { label: string; tone: ChipTone; note?: string }) {
+export function StatusChip({
+  label,
+  tone,
+  note,
+}: {
+  label: string;
+  tone: ChipTone;
+  note?: string;
+}) {
   return (
     <span className={`chip chip-${tone}`}>
       {label}
@@ -10,7 +18,15 @@ export function StatusChip({ label, tone, note }: { label: string; tone: ChipTon
   );
 }
 
-export function ClientBadge({ name, colour, size = 24 }: { name: string; colour: number; size?: number }) {
+export function ClientBadge({
+  name,
+  colour,
+  size = 24,
+}: {
+  name: string;
+  colour: number;
+  size?: number;
+}) {
   const mono = name
     .split(/\s+/)
     .filter(Boolean)
@@ -21,7 +37,12 @@ export function ClientBadge({ name, colour, size = 24 }: { name: string; colour:
   return (
     <span
       className="badge"
-      style={{ width: size, height: size, background: `var(--c${colour % 10})`, fontSize: size >= 32 ? 13 : 10 }}
+      style={{
+        width: size,
+        height: size,
+        background: `var(--c${colour % 10})`,
+        fontSize: size >= 32 ? 13 : 10,
+      }}
       aria-hidden="true"
     >
       {mono}
@@ -51,7 +72,15 @@ export function MoneyList({ items, empty = "0" }: { items: M[]; empty?: string }
   );
 }
 
-export function Stat({ label, children, href }: { label: string; children: React.ReactNode; href?: string }) {
+export function Stat({
+  label,
+  children,
+  href,
+}: {
+  label: string;
+  children: React.ReactNode;
+  href?: string;
+}) {
   const inner = (
     <>
       <div className="t-caption">{label}</div>
@@ -110,7 +139,11 @@ export function PageHeader({
   );
 }
 
-export function Tabs({ items }: { items: { href: string; label: React.ReactNode; current: boolean }[] }) {
+export function Tabs({
+  items,
+}: {
+  items: { href: string; label: React.ReactNode; current: boolean }[];
+}) {
   return (
     <nav className="tabs mb-6">
       {items.map((t) => (
@@ -122,7 +155,13 @@ export function Tabs({ items }: { items: { href: string; label: React.ReactNode;
   );
 }
 
-export function Empty({ children, action }: { children: React.ReactNode; action?: React.ReactNode }) {
+export function Empty({
+  children,
+  action,
+}: {
+  children: React.ReactNode;
+  action?: React.ReactNode;
+}) {
   return (
     <div className="well flex flex-col items-center gap-3">
       <p>{children}</p>
@@ -160,7 +199,13 @@ export function Progress({ value, max }: { value: number; max: number }) {
   const pct = max > 0 ? (value / max) * 100 : 0;
   const cls = pct > 100 ? "over" : pct >= 80 ? "warn" : "";
   return (
-    <div className={`progress ${cls}`} role="progressbar" aria-valuenow={Math.round(pct)} aria-valuemin={0} aria-valuemax={100}>
+    <div
+      className={`progress ${cls}`}
+      role="progressbar"
+      aria-valuenow={Math.round(pct)}
+      aria-valuemin={0}
+      aria-valuemax={100}
+    >
       <span style={{ width: `${Math.min(100, pct)}%` }} />
     </div>
   );

@@ -12,7 +12,10 @@ import { ActionForm } from "./toaster";
 import { ClientBadge } from "./ui";
 
 export function worked(t: TimerSnapshot, now: number): number {
-  const open = t.state === "running" && t.openSince ? Math.max(0, Math.floor((now - Date.parse(t.openSince)) / 1000)) : 0;
+  const open =
+    t.state === "running" && t.openSince
+      ? Math.max(0, Math.floor((now - Date.parse(t.openSince)) / 1000))
+      : 0;
   return t.workedSecondsClosed + open;
 }
 
@@ -55,7 +58,7 @@ export function TimerPill({
     window.addEventListener("pp:timer-toggle", toggle);
     const key = (e: KeyboardEvent) => {
       // ⌥T toggles the timer popover (Guide §6)
-      if (e.altKey && (e.code === "KeyT")) {
+      if (e.altKey && e.code === "KeyT") {
         e.preventDefault();
         setOpen((o) => !o);
       }
@@ -87,7 +90,11 @@ export function TimerPill({
     if (!nt && t === null) setOpen(false);
     // Tell the other tabs (06 §4.4)
     try {
-      new BroadcastChannel("paypure").postMessage({ topic: "timer", timer: t ?? null, local: true });
+      new BroadcastChannel("paypure").postMessage({
+        topic: "timer",
+        timer: t ?? null,
+        local: true,
+      });
     } catch {}
   }, []);
 
@@ -100,7 +107,10 @@ export function TimerPill({
       ? timer.segments.slice(1).reduce((s, seg, i) => {
           const prevEnd = timer.segments[i].endedAt;
           return prevEnd ? s + (Date.parse(seg.startedAt) - Date.parse(prevEnd)) / 1000 : s;
-        }, 0) + (paused && timer.segments.at(-1)?.endedAt ? (now - Date.parse(timer.segments.at(-1)?.endedAt as string)) / 1000 : 0)
+        }, 0) +
+        (paused && timer.segments.at(-1)?.endedAt
+          ? (now - Date.parse(timer.segments.at(-1)?.endedAt as string)) / 1000
+          : 0)
       : 0;
   const ariaLabel = timer
     ? `Timer ${paused ? "paused" : "running"}, ${formatDuration(secs)}${timer.task ? `, ${timer.task.clientName}, ${timer.task.name}` : ", no task"}`
@@ -122,10 +132,22 @@ export function TimerPill({
           >
             <span
               className={`w-1.5 h-1.5 rounded-full shrink-0 ${paused ? "" : "pulse"}`}
-              style={{ background: paused ? "var(--text-faint)" : long ? "var(--warning-fg)" : "var(--accent)" }}
+              style={{
+                background: paused
+                  ? "var(--text-faint)"
+                  : long
+                    ? "var(--warning-fg)"
+                    : "var(--accent)",
+              }}
             />
-            <span className={`truncate hidden sm:inline ${!timer.task ? "text-warning font-medium" : ""}`}>
-              {long ? `Running ${Math.floor(secs / 3600)}h · still working?` : timer.task ? `${timer.task.clientName} · ${timer.task.name}` : "Choose task…"}
+            <span
+              className={`truncate hidden sm:inline ${!timer.task ? "text-warning font-medium" : ""}`}
+            >
+              {long
+                ? `Running ${Math.floor(secs / 3600)}h · still working?`
+                : timer.task
+                  ? `${timer.task.clientName} · ${timer.task.name}`
+                  : "Choose task…"}
             </span>
             <span className={`tnum font-semibold ${paused ? "text-muted" : ""}`} aria-live="off">
               {formatDuration(secs, { withSeconds: true })}
@@ -134,23 +156,46 @@ export function TimerPill({
           <ActionForm action={timerTransition} onSuccess={onResult} showError={false}>
             <input type="hidden" name="entryId" value={timer.id} />
             {paused && (
-              <button type="submit" name="op" value="resume" className="btn btn-ghost btn-icon rounded-full" aria-label="Resume" title="Resume">
+              <button
+                type="submit"
+                name="op"
+                value="resume"
+                className="btn btn-ghost btn-icon rounded-full"
+                aria-label="Resume"
+                title="Resume"
+              >
                 <Play size={14} />
               </button>
             )}
-            <button type="submit" name="op" value="stop" className="btn btn-ghost btn-icon rounded-full" aria-label="Stop" title="Stop">
+            <button
+              type="submit"
+              name="op"
+              value="stop"
+              className="btn btn-ghost btn-icon rounded-full"
+              aria-label="Stop"
+              title="Stop"
+            >
               <Square size={14} fill="currentColor" />
             </button>
           </ActionForm>
         </div>
       ) : (
-        <button type="button" className="btn btn-ghost" onClick={() => setOpen((o) => !o)} aria-expanded={open}>
+        <button
+          type="button"
+          className="btn btn-ghost"
+          onClick={() => setOpen((o) => !o)}
+          aria-expanded={open}
+        >
           <Play size={14} /> <span className="hidden sm:inline">Start timer</span>
         </button>
       )}
 
       {open && (
-        <div className="pop absolute right-0 mt-2 w-[min(380px,calc(100vw-24px))] p-4 z-40" role="dialog" aria-label="Timer">
+        <div
+          className="pop absolute right-0 mt-2 w-[min(380px,calc(100vw-24px))] p-4 z-40"
+          role="dialog"
+          aria-label="Timer"
+        >
           {!timer ? (
             <IdlePopover catalog={catalog} onResult={onResult} />
           ) : (
@@ -172,10 +217,22 @@ export function TimerPill({
   );
 }
 
-function IdlePopover({ catalog, onResult }: { catalog: Catalog; onResult: (s: ActionState) => void }) {
+function IdlePopover({
+  catalog,
+  onResult,
+}: {
+  catalog: Catalog;
+  onResult: (s: ActionState) => void;
+}) {
   return (
     <ActionForm action={startTimer} onSuccess={onResult} className="space-y-3">
-      <TaskPicker tasks={catalog.tasks} recent={catalog.recentTaskIds} autoFocus submitOnPick label="Start a timer on" />
+      <TaskPicker
+        tasks={catalog.tasks}
+        recent={catalog.recentTaskIds}
+        autoFocus
+        submitOnPick
+        label="Start a timer on"
+      />
       <div className="flex items-center gap-2">
         <Submit className="btn btn-primary">
           <Play size={14} /> Start
@@ -228,13 +285,26 @@ function RunningPopover({
       </div>
 
       {needsTask && (
-        <div className="banner banner-warning text-sm">Choose a task to log {formatDuration(secs)}. The timer is paused meanwhile.</div>
+        <div className="banner banner-warning text-sm">
+          Choose a task to log {formatDuration(secs)}. The timer is paused meanwhile.
+        </div>
       )}
 
-      <ActionForm action={updateTimer} onSuccess={onResult} key={`task-${timer.task?.id ?? "none"}`}>
+      <ActionForm
+        action={updateTimer}
+        onSuccess={onResult}
+        key={`task-${timer.task?.id ?? "none"}`}
+      >
         <input type="hidden" name="entryId" value={timer.id} />
         {needsTask && <input type="hidden" name="thenStop" value="1" />}
-        <TaskPicker tasks={catalog.tasks} recent={catalog.recentTaskIds} defaultTaskId={timer.task?.id} submitOnPick label="Task" autoFocus={needsTask} />
+        <TaskPicker
+          tasks={catalog.tasks}
+          recent={catalog.recentTaskIds}
+          defaultTaskId={timer.task?.id}
+          submitOnPick
+          label="Task"
+          autoFocus={needsTask}
+        />
         <button type="submit" className="sr-only">
           Save task
         </button>
@@ -257,7 +327,8 @@ function RunningPopover({
             if (e.currentTarget.value !== timer.note) e.currentTarget.form?.requestSubmit();
           }}
           onKeyDown={(e) => {
-            if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) e.currentTarget.form?.requestSubmit();
+            if (e.key === "Enter" && (e.metaKey || e.ctrlKey))
+              e.currentTarget.form?.requestSubmit();
           }}
         />
         <button type="submit" className="sr-only">
@@ -270,7 +341,12 @@ function RunningPopover({
           <input type="hidden" name="entryId" value={timer.id} />
           <input type="hidden" name="billableField" value="1" />
           <label className="flex items-center gap-2">
-            <input type="checkbox" name="billable" defaultChecked={timer.billable} onChange={(e) => e.currentTarget.form?.requestSubmit()} />
+            <input
+              type="checkbox"
+              name="billable"
+              defaultChecked={timer.billable}
+              onChange={(e) => e.currentTarget.form?.requestSubmit()}
+            />
             Billable
           </label>
           <button type="submit" className="sr-only">
@@ -280,12 +356,25 @@ function RunningPopover({
       )}
 
       {timer.firstStartedAt && (
-        <ActionForm action={updateTimer} onSuccess={onResult} className="flex items-center gap-1 flex-wrap text-sm">
+        <ActionForm
+          action={updateTimer}
+          onSuccess={onResult}
+          className="flex items-center gap-1 flex-wrap text-sm"
+        >
           <input type="hidden" name="entryId" value={timer.id} />
           <input type="hidden" name="firstStartedAt" value={timer.firstStartedAt} />
-          <span className="text-muted mr-1">Started {formatTime(timer.firstStartedAt, tz, timeFormat)}</span>
+          <span className="text-muted mr-1">
+            Started {formatTime(timer.firstStartedAt, tz, timeFormat)}
+          </span>
           {[-15, -5, 5, 15].map((n) => (
-            <button key={n} type="submit" name="nudge" value={String(n)} className="btn btn-ghost btn-sm" aria-label={`Move start ${n} minutes`}>
+            <button
+              key={n}
+              type="submit"
+              name="nudge"
+              value={String(n)}
+              className="btn btn-ghost btn-sm"
+              aria-label={`Move start ${n} minutes`}
+            >
               {n > 0 ? `+${n}` : n}
             </button>
           ))}
@@ -300,7 +389,13 @@ function RunningPopover({
       <ActionForm action={timerTransition} onSuccess={onResult} className="flex items-center gap-2">
         <input type="hidden" name="entryId" value={timer.id} />
         {/* Stop is the primary action: first submit button in DOM order (Guide §7.2 rule 2) */}
-        <Submit className="btn btn-primary" name="op" value="stop" disabled={needsTask} title={needsTask ? "Choose a task first" : undefined}>
+        <Submit
+          className="btn btn-primary"
+          name="op"
+          value="stop"
+          disabled={needsTask}
+          title={needsTask ? "Choose a task first" : undefined}
+        >
           <Square size={14} fill="currentColor" /> Stop
         </Submit>
         {timer.state === "running" ? (
@@ -312,7 +407,13 @@ function RunningPopover({
             <Play size={14} /> Resume
           </button>
         )}
-        <button type="submit" name="op" value="discard" className="btn btn-ghost ml-auto text-danger" aria-label="Discard timer">
+        <button
+          type="submit"
+          name="op"
+          value="discard"
+          className="btn btn-ghost ml-auto text-danger"
+          aria-label="Discard timer"
+        >
           <Trash2 size={14} /> Discard
         </button>
       </ActionForm>

@@ -19,7 +19,11 @@ export async function login(_: ActionState, fd: FormData): Promise<ActionState> 
   let ok = false;
   const r = await run(async () => {
     const { token } = await api<{ token: string }>("/v1/auth/login", {
-      body: { email: str(fd, "email"), password: String(fd.get("password") ?? ""), tz: str(fd, "tz") || undefined },
+      body: {
+        email: str(fd, "email"),
+        password: String(fd.get("password") ?? ""),
+        tz: str(fd, "tz") || undefined,
+      },
       token: null,
     });
     await setSession(token);
@@ -33,7 +37,11 @@ export async function acceptInvite(_: ActionState, fd: FormData): Promise<Action
   let ok = false;
   const r = await run(async () => {
     const { token } = await api<{ token: string }>("/v1/auth/accept-invite", {
-      body: { token: str(fd, "token"), password: String(fd.get("password") ?? ""), tz: str(fd, "tz") || undefined },
+      body: {
+        token: str(fd, "token"),
+        password: String(fd.get("password") ?? ""),
+        tz: str(fd, "tz") || undefined,
+      },
       token: null,
     });
     await setSession(token);

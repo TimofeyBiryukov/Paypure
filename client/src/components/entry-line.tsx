@@ -21,7 +21,11 @@ export function EntryLine({
   selectable?: boolean;
 }) {
   const breaks = Math.max(0, e.segments.length - 1);
-  const firstLine = e.note.split("\n").find((l) => l.trim())?.replace(/^\s*[-*]\s+/, "") ?? "";
+  const firstLine =
+    e.note
+      .split("\n")
+      .find((l) => l.trim())
+      ?.replace(/^\s*[-*]\s+/, "") ?? "";
   const more = e.note.split("\n").filter((l) => l.trim()).length - 1;
   const billedIssued = e.invoice?.status === "issued";
   const href = editHref ?? `/time?view=day&date=${e.date}&edit=${e.id}`;
@@ -40,7 +44,11 @@ export function EntryLine({
       )}
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2 min-w-0">
-          {e.task ? <ClientBadge name={e.task.clientName} colour={e.task.colour} size={20} /> : <span className="w-5" />}
+          {e.task ? (
+            <ClientBadge name={e.task.clientName} colour={e.task.colour} size={20} />
+          ) : (
+            <span className="w-5" />
+          )}
           <Link href={href} className="truncate hover:text-accent" scroll={false}>
             {e.task ? (
               <>
@@ -53,13 +61,19 @@ export function EntryLine({
               <span className="text-warning font-medium">Choose task…</span>
             )}
           </Link>
-          {e.state !== "stopped" && <span className={`chip chip-info ${e.state === "running" ? "" : "plain"}`}>{e.state === "running" ? "Running" : "Paused"}</span>}
+          {e.state !== "stopped" && (
+            <span className={`chip chip-info ${e.state === "running" ? "" : "plain"}`}>
+              {e.state === "running" ? "Running" : "Paused"}
+            </span>
+          )}
         </div>
         {!compact && firstLine && (
           <details className="mt-0.5 text-muted group">
             <summary className="list-none cursor-pointer truncate">
               {firstLine}
-              {more > 0 && <span className="text-accent ml-2 group-open:hidden">+{more} lines</span>}
+              {more > 0 && (
+                <span className="text-accent ml-2 group-open:hidden">+{more} lines</span>
+              )}
             </summary>
             {more > 0 && <Note text={e.note} className="mt-1" />}
           </details>
@@ -74,11 +88,15 @@ export function EntryLine({
               ‖ {breaks}
             </span>
           )}
-          <span className="font-semibold tnum w-12 text-right">{formatDuration(e.durationSeconds)}</span>
+          <span className="font-semibold tnum w-12 text-right">
+            {formatDuration(e.durationSeconds)}
+          </span>
         </div>
         <div className="flex items-center gap-2 justify-end mt-0.5 text-[12px]">
           {isAdmin && e.valueMinor != null && e.task && !e.invoice && !e.offInvoice && (
-            <span className="text-muted tnum">{formatMoney({ minor: e.valueMinor, currency: e.task.currency })}</span>
+            <span className="text-muted tnum">
+              {formatMoney({ minor: e.valueMinor, currency: e.task.currency })}
+            </span>
           )}
           <EntryTag e={e} isAdmin={isAdmin} />
         </div>
@@ -99,9 +117,17 @@ export function EntryTag({ e, isAdmin }: { e: EntryRow; isAdmin: boolean }) {
       <span className="chip chip-neutral plain">{label}</span>
     );
   }
-  if (e.offInvoice === "billed_elsewhere") return <span className="chip chip-neutral plain">Billed elsewhere{e.offInvoiceRef ? ` · ${e.offInvoiceRef}` : ""}</span>;
-  if (e.offInvoice === "written_off") return <span className="chip chip-neutral plain">Written off</span>;
-  if (e.task?.billingMode === "fixed") return <span className="chip chip-neutral plain">Fixed fee</span>;
-  if (e.task?.billingMode === "non_billable" || !e.billable) return <span className="chip chip-neutral plain">Non-billable</span>;
+  if (e.offInvoice === "billed_elsewhere")
+    return (
+      <span className="chip chip-neutral plain">
+        Billed elsewhere{e.offInvoiceRef ? ` · ${e.offInvoiceRef}` : ""}
+      </span>
+    );
+  if (e.offInvoice === "written_off")
+    return <span className="chip chip-neutral plain">Written off</span>;
+  if (e.task?.billingMode === "fixed")
+    return <span className="chip chip-neutral plain">Fixed fee</span>;
+  if (e.task?.billingMode === "non_billable" || !e.billable)
+    return <span className="chip chip-neutral plain">Non-billable</span>;
   return null;
 }

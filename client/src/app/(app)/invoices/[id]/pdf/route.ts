@@ -4,7 +4,9 @@ import { apiRaw } from "@/server/api";
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const version = new URL(request.url).searchParams.get("version");
-  const res = await apiRaw(`/v1/invoices/${id}/pdf${version ? `?version=${encodeURIComponent(version)}` : ""}`);
+  const res = await apiRaw(
+    `/v1/invoices/${id}/pdf${version ? `?version=${encodeURIComponent(version)}` : ""}`,
+  );
   if (!res.ok) return new Response(await res.text(), { status: res.status });
   return new Response(res.body, {
     headers: {

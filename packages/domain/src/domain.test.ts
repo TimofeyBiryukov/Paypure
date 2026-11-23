@@ -37,21 +37,39 @@ describe("07 §9 worked examples", () => {
       taskName: "T",
       rateMinor: 9000,
     }));
-    const perEntry = buildTimeLines(entries, { mode: "per_entry", showDates: true, showNotes: true });
+    const perEntry = buildTimeLines(entries, {
+      mode: "per_entry",
+      showDates: true,
+      showNotes: true,
+    });
     const perEntryTotal = computeInvoice(
       perEntry.map((l) => ({ ...l, taxIds: [] })),
       [],
     ).totalMinor;
     expect(perEntry.map((l) => l.qtyHundredths)).toEqual([17, 17, 17]);
     expect(perEntryTotal).toBe(4590);
-    const grouped = buildTimeLines(entries, { mode: "per_task", showDates: true, showNotes: false });
+    const grouped = buildTimeLines(entries, {
+      mode: "per_task",
+      showDates: true,
+      showNotes: false,
+    });
     expect(grouped).toHaveLength(1);
     expect(grouped[0].qtyHundredths).toBe(52);
-    expect(computeInvoice(grouped.map((l) => ({ ...l, taxIds: [] })), []).totalMinor).toBe(4680);
+    expect(
+      computeInvoice(
+        grouped.map((l) => ({ ...l, taxIds: [] })),
+        [],
+      ).totalMinor,
+    ).toBe(4680);
   });
   it("5: invoice with VAT", () => {
     const r = computeInvoice(
-      [112500, 279000, 4000].map((rate) => ({ kind: "manual" as const, qtyHundredths: 100, rateMinor: rate, taxIds: ["vat"] })),
+      [112500, 279000, 4000].map((rate) => ({
+        kind: "manual" as const,
+        qtyHundredths: 100,
+        rateMinor: rate,
+        taxIds: ["vat"],
+      })),
       [{ id: "vat", name: "VAT", rateBp: 1000 }],
     );
     expect(r.subtotalMinor).toBe(395500);
@@ -115,7 +133,13 @@ describe("07 §9 worked examples", () => {
     expect(formatMoney({ minor: 12000, currency: "JPY" })).toBe("¥12,000");
   });
   it("14: overpaid", () => {
-    const s = displayStatus({ status: "issued", totalMinor: 435050, netPaidMinor: 440000, dueDate: "2026-12-01", today: "2026-12-10" });
+    const s = displayStatus({
+      status: "issued",
+      totalMinor: 435050,
+      netPaidMinor: 440000,
+      dueDate: "2026-12-01",
+      today: "2026-12-10",
+    });
     expect(s.key).toBe("paid");
     expect(s.balanceMinor).toBe(-4950);
     expect(s.overpaidMinor).toBe(4950);
@@ -123,16 +147,36 @@ describe("07 §9 worked examples", () => {
 });
 
 describe("rates", () => {
-  const base = { taskRateMinor: null, projectRateMinor: null, clientRateMinor: null, clientCurrency: "EUR", workspaceRateMinor: null, workspaceCurrency: "EUR" };
+  const base = {
+    taskRateMinor: null,
+    projectRateMinor: null,
+    clientRateMinor: null,
+    clientCurrency: "EUR",
+    workspaceRateMinor: null,
+    workspaceCurrency: "EUR",
+  };
   it("resolves in order and a 0 rate is real", () => {
-    expect(resolveRate({ ...base, clientRateMinor: 9000, projectRateMinor: 0 })).toEqual({ rateMinor: 0, source: "project" });
-    expect(resolveRate({ ...base, workspaceRateMinor: 5000 })).toEqual({ rateMinor: 5000, source: "workspace" });
+    expect(resolveRate({ ...base, clientRateMinor: 9000, projectRateMinor: 0 })).toEqual({
+      rateMinor: 0,
+      source: "project",
+    });
+    expect(resolveRate({ ...base, workspaceRateMinor: 5000 })).toEqual({
+      rateMinor: 5000,
+      source: "workspace",
+    });
   });
 });
 
 describe("status", () => {
   const s = (o: Partial<Parameters<typeof displayStatus>[0]>) =>
-    displayStatus({ status: "issued", totalMinor: 1000, netPaidMinor: 0, dueDate: "2026-12-15", today: "2026-12-01", ...o }).label;
+    displayStatus({
+      status: "issued",
+      totalMinor: 1000,
+      netPaidMinor: 0,
+      dueDate: "2026-12-15",
+      today: "2026-12-01",
+      ...o,
+    }).label;
   it("orders checks", () => {
     expect(s({ status: "void" })).toBe("Void");
     expect(s({ status: "draft" })).toBe("Draft");
@@ -191,8 +235,16 @@ describe("time zones", () => {
 
 describe("fixed line", () => {
   it("whole vs part", () => {
-    const common = { taskId: "t", projectName: "Brand", taskName: "Logo", currency: "EUR", feeMinor: 120000 };
-    expect(buildFixedLine({ ...common, remainingMinor: 120000, amountMinor: 120000 }).detail).toBe("Fixed fee");
+    const common = {
+      taskId: "t",
+      projectName: "Brand",
+      taskName: "Logo",
+      currency: "EUR",
+      feeMinor: 120000,
+    };
+    expect(buildFixedLine({ ...common, remainingMinor: 120000, amountMinor: 120000 }).detail).toBe(
+      "Fixed fee",
+    );
     expect(buildFixedLine({ ...common, remainingMinor: 120000, amountMinor: 60000 }).detail).toBe(
       "Part of €1,200.00 fixed fee · €600.00 remaining after this invoice",
     );

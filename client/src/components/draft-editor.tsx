@@ -69,7 +69,11 @@ export function DraftEditor({
   const [termsDays, setTermsDays] = useState(open.termsDays);
   const [dueDate, setDueDate] = useState(open.dueDateManual ? (open.dueDate ?? "") : "");
   const [issueDate, setIssueDate] = useState(open.issueDate ?? "");
-  const [accMode, setAccMode] = useState(open.paymentAccountMode === "account" && open.paymentAccountId ? open.paymentAccountId : open.paymentAccountMode);
+  const [accMode, setAccMode] = useState(
+    open.paymentAccountMode === "account" && open.paymentAccountId
+      ? open.paymentAccountId
+      : open.paymentAccountMode,
+  );
   const [newTax, setNewTax] = useState({ name: "", rate: "" });
   const [state, formAction, pending] = useActionState(saveDraft, null);
   const formRef = useRef<HTMLFormElement>(null);
@@ -77,7 +81,10 @@ export function DraftEditor({
   const [savedAt, setSavedAt] = useState<string | null>(null);
 
   const sheetLines = lines.map((l) => ({ ...l }));
-  const computed = useMemo(() => sheetFromLines(sheetLines, taxes), [JSON.stringify(sheetLines), JSON.stringify(taxes)]);
+  const computed = useMemo(
+    () => sheetFromLines(sheetLines, taxes),
+    [JSON.stringify(sheetLines), JSON.stringify(taxes)],
+  );
   useEffect(() => onTotal?.(computed.totalMinor), [computed.totalMinor, onTotal]);
 
   const payload = {
@@ -118,7 +125,11 @@ export function DraftEditor({
   // Adopt server ids for new lines and taxes after a save.
   useEffect(() => {
     if (!state?.ok || !state.data) return;
-    const d = state.data as { savedAt: string; taxIdMap: Record<string, string>; lineIds: string[] };
+    const d = state.data as {
+      savedAt: string;
+      taxIdMap: Record<string, string>;
+      lineIds: string[];
+    };
     setSavedAt(d.savedAt);
     dirty.current = false;
     const map = d.taxIdMap ?? {};
@@ -132,7 +143,8 @@ export function DraftEditor({
     );
   }, [state]);
 
-  const update = (key: string, patch: Partial<Line>) => setLines((ls) => ls.map((l) => (l.key === key ? { ...l, ...patch } : l)));
+  const update = (key: string, patch: Partial<Line>) =>
+    setLines((ls) => ls.map((l) => (l.key === key ? { ...l, ...patch } : l)));
   const addLine = (kind: "manual" | "discount") =>
     setLines((ls) => {
       const nl: Line = {
@@ -157,7 +169,11 @@ export function DraftEditor({
 
   return (
     <div className="space-y-6">
-      <form ref={formRef} action={formAction} className="grid xl:grid-cols-[1fr_300px] gap-6 items-start">
+      <form
+        ref={formRef}
+        action={formAction}
+        className="grid xl:grid-cols-[1fr_300px] gap-6 items-start"
+      >
         <input type="hidden" name="invoiceId" value={invoiceId} />
         <input type="hidden" name="payload" value={payloadJson} />
         <div className="card p-5 space-y-4 min-w-0">
@@ -166,7 +182,14 @@ export function DraftEditor({
             <label className="label" htmlFor="summary">
               Summary (optional, one line)
             </label>
-            <input id="summary" className="input" value={summary} maxLength={500} onChange={(e) => setSummary(e.target.value)} placeholder="Website and app development, November" />
+            <input
+              id="summary"
+              className="input"
+              value={summary}
+              maxLength={500}
+              onChange={(e) => setSummary(e.target.value)}
+              placeholder="Website and app development, November"
+            />
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -182,7 +205,12 @@ export function DraftEditor({
               </thead>
               <tbody>
                 {lines.map((l) => {
-                  const i = computed.lines.findIndex((_, idx) => (lines.filter((x) => x.kind !== "discount").concat(lines.filter((x) => x.kind === "discount"))[idx]?.key === l.key));
+                  const i = computed.lines.findIndex(
+                    (_, idx) =>
+                      lines
+                        .filter((x) => x.kind !== "discount")
+                        .concat(lines.filter((x) => x.kind === "discount"))[idx]?.key === l.key,
+                  );
                   const amount = computed.lines[i]?.amountMinor ?? 0;
                   return (
                     <tr key={l.key} className="border-t border-line align-top">
@@ -193,16 +221,31 @@ export function DraftEditor({
                             <select
                               className="select w-auto h-8 py-0"
                               value={l.discountRateBp != null ? "pct" : "amt"}
-                              onChange={(e) => update(l.key, e.target.value === "pct" ? { discountRateBp: 1000 } : { discountRateBp: null, rateMinor: -Math.abs(amount) })}
+                              onChange={(e) =>
+                                update(
+                                  l.key,
+                                  e.target.value === "pct"
+                                    ? { discountRateBp: 1000 }
+                                    : { discountRateBp: null, rateMinor: -Math.abs(amount) },
+                                )
+                              }
                               aria-label="Discount type"
                             >
                               <option value="pct">Percent</option>
                               <option value="amt">Amount</option>
                             </select>
                             {l.discountRateBp != null ? (
-                              <PercentInput bp={l.discountRateBp} onChange={(bp) => update(l.key, { discountRateBp: bp })} />
+                              <PercentInput
+                                bp={l.discountRateBp}
+                                onChange={(bp) => update(l.key, { discountRateBp: bp })}
+                              />
                             ) : (
-                              <MoneyInput minor={Math.abs(l.rateMinor)} currency={currency} onChange={(m) => update(l.key, { rateMinor: -m })} label="Discount amount" />
+                              <MoneyInput
+                                minor={Math.abs(l.rateMinor)}
+                                currency={currency}
+                                onChange={(m) => update(l.key, { rateMinor: -m })}
+                                label="Discount amount"
+                              />
                             )}
                           </div>
                         ) : (
@@ -215,11 +258,24 @@ export function DraftEditor({
                               placeholder="Description"
                               onChange={(e) => update(l.key, { title: e.target.value })}
                             />
-                            <textarea className="textarea min-h-[32px] mt-1 text-muted text-[13px]" rows={1} value={l.detail} aria-label="Line detail" placeholder="Detail (optional)" onChange={(e) => update(l.key, { detail: e.target.value })} />
+                            <textarea
+                              className="textarea min-h-[32px] mt-1 text-muted text-[13px]"
+                              rows={1}
+                              value={l.detail}
+                              aria-label="Line detail"
+                              placeholder="Detail (optional)"
+                              onChange={(e) => update(l.key, { detail: e.target.value })}
+                            />
                             <div className="flex items-center gap-2 mt-1 flex-wrap">
-                              {l.kind === "time" && <span className="t-caption">{l.entryCount} {l.entryCount === 1 ? "entry" : "entries"}</span>}
+                              {l.kind === "time" && (
+                                <span className="t-caption">
+                                  {l.entryCount} {l.entryCount === 1 ? "entry" : "entries"}
+                                </span>
+                              )}
                               {l.kind === "fixed" && <span className="t-caption">Fixed fee</span>}
-                              {l.outdated && <span className="chip chip-warning plain">Out of date</span>}
+                              {l.outdated && (
+                                <span className="chip chip-warning plain">Out of date</span>
+                              )}
                               {taxes.map((t) => {
                                 const on = l.taxIds.includes(t.id);
                                 return (
@@ -228,7 +284,13 @@ export function DraftEditor({
                                     type="button"
                                     className={`chip plain ${on ? "chip-info" : "chip-void"}`}
                                     aria-pressed={on}
-                                    onClick={() => update(l.key, { taxIds: on ? l.taxIds.filter((x) => x !== t.id) : [...l.taxIds, t.id] })}
+                                    onClick={() =>
+                                      update(l.key, {
+                                        taxIds: on
+                                          ? l.taxIds.filter((x) => x !== t.id)
+                                          : [...l.taxIds, t.id],
+                                      })
+                                    }
                                   >
                                     {t.name}
                                   </button>
@@ -247,21 +309,49 @@ export function DraftEditor({
                             inputMode="decimal"
                             onBlur={(e) => {
                               const n = Number(e.target.value.replace(",", "."));
-                              if (Number.isFinite(n) && n >= 0) update(l.key, { qtyHundredths: Math.round(n * 100) });
+                              if (Number.isFinite(n) && n >= 0)
+                                update(l.key, { qtyHundredths: Math.round(n * 100) });
                             }}
                           />
                         )}
                       </td>
                       <td className="py-2 pl-2">
-                        {l.kind === "manual" && <input className="input h-8" aria-label="Unit" value={l.unit} onChange={(e) => update(l.key, { unit: e.target.value })} placeholder="h" />}
+                        {l.kind === "manual" && (
+                          <input
+                            className="input h-8"
+                            aria-label="Unit"
+                            value={l.unit}
+                            onChange={(e) => update(l.key, { unit: e.target.value })}
+                            placeholder="h"
+                          />
+                        )}
                         {l.kind === "time" && <span className="text-muted">h</span>}
                       </td>
                       <td className="py-2 text-right">
-                        {l.kind !== "discount" && <MoneyInput minor={l.rateMinor} currency={currency} onChange={(m) => update(l.key, { rateMinor: m })} label="Rate" />}
+                        {l.kind !== "discount" && (
+                          <MoneyInput
+                            minor={l.rateMinor}
+                            currency={currency}
+                            onChange={(m) => update(l.key, { rateMinor: m })}
+                            label="Rate"
+                          />
+                        )}
                       </td>
-                      <td className="py-2 text-right tnum font-medium whitespace-nowrap">{formatMoney({ minor: amount, currency })}</td>
+                      <td className="py-2 text-right tnum font-medium whitespace-nowrap">
+                        {formatMoney({ minor: amount, currency })}
+                      </td>
                       <td className="py-2 text-right">
-                        <button type="button" className="btn btn-ghost btn-icon" aria-label="Remove line" title={l.kind === "time" ? "Removes the line; its time goes back to unbilled" : "Remove line"} onClick={() => setLines((ls) => ls.filter((x) => x.key !== l.key))}>
+                        <button
+                          type="button"
+                          className="btn btn-ghost btn-icon"
+                          aria-label="Remove line"
+                          title={
+                            l.kind === "time"
+                              ? "Removes the line; its time goes back to unbilled"
+                              : "Remove line"
+                          }
+                          onClick={() => setLines((ls) => ls.filter((x) => x.key !== l.key))}
+                        >
                           <Trash2 size={14} />
                         </button>
                       </td>
@@ -272,10 +362,20 @@ export function DraftEditor({
             </table>
           </div>
           <div className="flex gap-2">
-            <button type="button" className="btn btn-secondary btn-sm" onClick={() => addLine("manual")}>
+            <button
+              type="button"
+              className="btn btn-secondary btn-sm"
+              onClick={() => addLine("manual")}
+            >
               <Plus size={14} /> Manual line
             </button>
-            <button type="button" className="btn btn-secondary btn-sm" disabled={hasDiscount} title={hasDiscount ? "One discount per invoice" : undefined} onClick={() => addLine("discount")}>
+            <button
+              type="button"
+              className="btn btn-secondary btn-sm"
+              disabled={hasDiscount}
+              title={hasDiscount ? "One discount per invoice" : undefined}
+              onClick={() => addLine("discount")}
+            >
               <Plus size={14} /> Discount
             </button>
           </div>
@@ -294,13 +394,18 @@ export function DraftEditor({
             ))}
             <div className="flex justify-between py-2 border-t border-line font-semibold">
               <dt>Total</dt>
-              <dd className="tnum">{formatMoney({ minor: computed.totalMinor, currency }, { withCode: true })}</dd>
+              <dd className="tnum">
+                {formatMoney({ minor: computed.totalMinor, currency }, { withCode: true })}
+              </dd>
             </div>
           </dl>
-          {computed.errors.length > 0 && <p className="banner banner-danger text-sm">{computed.errors[0]}</p>}
+          {computed.errors.length > 0 && (
+            <p className="banner banner-danger text-sm">{computed.errors[0]}</p>
+          )}
           {overpay && (
             <p className="banner banner-warning text-sm">
-              Paid {formatMoney({ minor: netPaidMinor, currency })} is more than the new total {formatMoney({ minor: computed.totalMinor, currency })}. It will be overpaid by{" "}
+              Paid {formatMoney({ minor: netPaidMinor, currency })} is more than the new total{" "}
+              {formatMoney({ minor: computed.totalMinor, currency })}. It will be overpaid by{" "}
               {formatMoney({ minor: netPaidMinor - computed.totalMinor, currency })}.
             </p>
           )}
@@ -308,7 +413,13 @@ export function DraftEditor({
             <label className="label" htmlFor="notes">
               Notes
             </label>
-            <textarea id="notes" className="textarea" value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} />
+            <textarea
+              id="notes"
+              className="textarea"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              rows={2}
+            />
           </div>
         </div>
 
@@ -318,8 +429,17 @@ export function DraftEditor({
               <label className="label" htmlFor="issueDate">
                 Issue date
               </label>
-              <input id="issueDate" type="date" className="input" value={issueDate} max={today} onChange={(e) => setIssueDate(e.target.value)} />
-              <p className="hint">{issueDate ? "Can't be before the last issued invoice." : "Set when you send."}</p>
+              <input
+                id="issueDate"
+                type="date"
+                className="input"
+                value={issueDate}
+                max={today}
+                onChange={(e) => setIssueDate(e.target.value)}
+              />
+              <p className="hint">
+                {issueDate ? "Can't be before the last issued invoice." : "Set when you send."}
+              </p>
             </div>
           )}
           <div className="grid grid-cols-2 gap-3">
@@ -327,13 +447,27 @@ export function DraftEditor({
               <label className="label" htmlFor="terms">
                 Terms (days)
               </label>
-              <input id="terms" type="number" min={0} max={365} className="input" value={termsDays} onChange={(e) => setTermsDays(Number(e.target.value) || 0)} />
+              <input
+                id="terms"
+                type="number"
+                min={0}
+                max={365}
+                className="input"
+                value={termsDays}
+                onChange={(e) => setTermsDays(Number(e.target.value) || 0)}
+              />
             </div>
             <div>
               <label className="label" htmlFor="due">
                 Due
               </label>
-              <input id="due" type="date" className="input" value={dueDate || due} onChange={(e) => setDueDate(e.target.value)} />
+              <input
+                id="due"
+                type="date"
+                className="input"
+                value={dueDate || due}
+                onChange={(e) => setDueDate(e.target.value)}
+              />
             </div>
           </div>
           <div>
@@ -354,7 +488,9 @@ export function DraftEditor({
                     aria-label={`Remove ${t.name}`}
                     onClick={() => {
                       setTaxes((ts) => ts.filter((x) => x.id !== t.id));
-                      setLines((ls) => ls.map((l) => ({ ...l, taxIds: l.taxIds.filter((x) => x !== t.id) })));
+                      setLines((ls) =>
+                        ls.map((l) => ({ ...l, taxIds: l.taxIds.filter((x) => x !== t.id) })),
+                      );
                     }}
                   >
                     <Trash2 size={14} />
@@ -363,8 +499,20 @@ export function DraftEditor({
               ))}
             </ul>
             <div className="flex gap-1">
-              <input className="input h-8" placeholder="VAT" aria-label="Tax name" value={newTax.name} onChange={(e) => setNewTax((x) => ({ ...x, name: e.target.value }))} />
-              <input className="input h-8 w-20" placeholder="10%" aria-label="Tax rate" value={newTax.rate} onChange={(e) => setNewTax((x) => ({ ...x, rate: e.target.value }))} />
+              <input
+                className="input h-8"
+                placeholder="VAT"
+                aria-label="Tax name"
+                value={newTax.name}
+                onChange={(e) => setNewTax((x) => ({ ...x, name: e.target.value }))}
+              />
+              <input
+                className="input h-8 w-20"
+                placeholder="10%"
+                aria-label="Tax rate"
+                value={newTax.rate}
+                onChange={(e) => setNewTax((x) => ({ ...x, rate: e.target.value }))}
+              />
               <button
                 type="button"
                 className="btn btn-secondary btn-sm"
@@ -386,7 +534,12 @@ export function DraftEditor({
             <label className="label" htmlFor="account">
               Pay to
             </label>
-            <select id="account" className="select" value={accMode} onChange={(e) => setAccMode(e.target.value)}>
+            <select
+              id="account"
+              className="select"
+              value={accMode}
+              onChange={(e) => setAccMode(e.target.value)}
+            >
               <option value="default">Default for {currency}</option>
               {accounts.map((a) => (
                 <option key={a.id} value={a.id}>
@@ -396,10 +549,22 @@ export function DraftEditor({
               ))}
               <option value="none">None</option>
             </select>
-            {accounts.length === 0 && <p className="hint text-warning">No payment account for {currency} · add one in Settings → Business</p>}
+            {accounts.length === 0 && (
+              <p className="hint text-warning">
+                No payment account for {currency} · add one in Settings → Business
+              </p>
+            )}
           </div>
           <p className="t-caption" aria-live="polite">
-            {pending ? "Saving…" : state && !state.ok ? <span className="text-danger">{state.error}</span> : savedAt ? `Saved · ${new Date(savedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}` : "All changes save automatically"}
+            {pending ? (
+              "Saving…"
+            ) : state && !state.ok ? (
+              <span className="text-danger">{state.error}</span>
+            ) : savedAt ? (
+              `Saved · ${new Date(savedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`
+            ) : (
+              "All changes save automatically"
+            )}
           </p>
           <button type="submit" className="btn btn-secondary btn-sm">
             Save now
@@ -407,7 +572,9 @@ export function DraftEditor({
         </aside>
       </form>
 
-      {open.isCorrection && current && <ChangesPanel before={current} after={computed} currency={currency} />}
+      {open.isCorrection && current && (
+        <ChangesPanel before={current} after={computed} currency={currency} />
+      )}
 
       <section>
         <h2 className="t-title-3 mb-2">Preview</h2>
@@ -433,21 +600,45 @@ export function DraftEditor({
 }
 
 /** Changed / added / removed lines and totals before → after (08 §4.2). */
-function ChangesPanel({ before, after, currency }: { before: SheetData; after: { lines: SheetData["lines"]; totalMinor: number }; currency: string }) {
+function ChangesPanel({
+  before,
+  after,
+  currency,
+}: {
+  before: SheetData;
+  after: { lines: SheetData["lines"]; totalMinor: number };
+  currency: string;
+}) {
   const m = (n: number) => formatMoney({ minor: n, currency });
   const key = (l: SheetData["lines"][number]) => l.title;
   const changes: string[] = [];
   for (const l of after.lines) {
     const b = before.lines.find((x) => key(x) === key(l));
     if (!b) changes.push(`Added "${l.title}" (${m(l.amountMinor)})`);
-    else if (b.qtyHundredths !== l.qtyHundredths || b.rateMinor !== l.rateMinor || b.detail !== l.detail)
-      changes.push(`"${l.title}": ${(b.qtyHundredths / 100).toFixed(2)} × ${m(b.rateMinor)} → ${(l.qtyHundredths / 100).toFixed(2)} × ${m(l.rateMinor)}${b.detail !== l.detail ? " (detail edited)" : ""}`);
+    else if (
+      b.qtyHundredths !== l.qtyHundredths ||
+      b.rateMinor !== l.rateMinor ||
+      b.detail !== l.detail
+    )
+      changes.push(
+        `"${l.title}": ${(b.qtyHundredths / 100).toFixed(2)} × ${m(b.rateMinor)} → ${(l.qtyHundredths / 100).toFixed(2)} × ${m(l.rateMinor)}${b.detail !== l.detail ? " (detail edited)" : ""}`,
+      );
   }
-  for (const b of before.lines) if (!after.lines.find((l) => key(l) === key(b))) changes.push(`Removed "${b.title}" (${m(b.amountMinor)})`);
+  for (const b of before.lines)
+    if (!after.lines.find((l) => key(l) === key(b)))
+      changes.push(`Removed "${b.title}" (${m(b.amountMinor)})`);
   return (
     <section className="card p-5">
       <h2 className="t-title-3 mb-2">Changes</h2>
-      {changes.length === 0 ? <p className="text-muted">No line changes yet.</p> : <ul className="list-disc pl-5 space-y-1">{changes.map((c) => <li key={c}>{c}</li>)}</ul>}
+      {changes.length === 0 ? (
+        <p className="text-muted">No line changes yet.</p>
+      ) : (
+        <ul className="list-disc pl-5 space-y-1">
+          {changes.map((c) => (
+            <li key={c}>{c}</li>
+          ))}
+        </ul>
+      )}
       <p className="mt-3 tnum">
         Total {m(before.totalMinor)} → <b>{m(after.totalMinor)}</b>
       </p>
@@ -457,10 +648,22 @@ function ChangesPanel({ before, after, currency }: { before: SheetData; after: {
 
 export function correctionSummary(before: SheetData, afterTotal: number, currency: string) {
   const m = (n: number) => formatMoney({ minor: n, currency });
-  return before.totalMinor === afterTotal ? "Details updated" : `Total ${m(before.totalMinor)} → ${m(afterTotal)}`;
+  return before.totalMinor === afterTotal
+    ? "Details updated"
+    : `Total ${m(before.totalMinor)} → ${m(afterTotal)}`;
 }
 
-function MoneyInput({ minor, currency, onChange, label }: { minor: number; currency: string; onChange: (m: number) => void; label: string }) {
+function MoneyInput({
+  minor,
+  currency,
+  onChange,
+  label,
+}: {
+  minor: number;
+  currency: string;
+  onChange: (m: number) => void;
+  label: string;
+}) {
   const [v, setV] = useState(minorToDecimalString(minor, currency));
   useEffect(() => setV(minorToDecimalString(minor, currency)), [minor, currency]);
   return (

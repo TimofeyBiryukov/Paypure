@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "permissions": {
+    "allow": [
+      "Bash(scripts/agent/check.sh:*)",
+      "Bash(bash scripts/agent/check.sh:*)",
+      "Bash(scripts/agent/setup.sh:*)",
+      "Bash(bash scripts/agent/setup.sh:*)",
+      "Bash(scripts/agent/stack.sh:*)",
+      "Bash(bash scripts/agent/stack.sh:*)",
+      "Bash(scripts/agent/land.sh:*)",
+      "Bash(bash scripts/agent/land.sh:*)"
+    ]
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/scripts/agent/session-start.sh\"",
+            "timeout": 600
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash|Edit|Write|MultiEdit|NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/scripts/agent/guard.mjs\"",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}

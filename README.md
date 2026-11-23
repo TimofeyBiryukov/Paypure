@@ -17,23 +17,33 @@ so the first invoice gets number **188**.
 Optional: `docker compose --profile tools up -d adminer` (DB UI on :8081). Emails use
 `MAIL_TRANSPORT=log`: each one is written in full to the API log (`docker compose logs api`).
 
-Checks (all run in containers):
+Checks: `bash scripts/agent/check.sh` runs lint, typecheck and tests on the host. Add `--full`
+for production builds. CI runs the same checks on every PR, plus migrations against a fresh
+Postgres.
+
+## Working with agents
+
+Agents work in parallel, each in its own git worktree with its own branch, ports and database,
+and merge their own PRs once CI passes. The rules are in [`AGENTS.md`](AGENTS.md).
 
 ```bash
-docker compose exec -w /app/packages/domain api pnpm test
-docker compose exec -w /app/api api pnpm exec tsc --noEmit
-docker compose exec -w /app/client client pnpm exec tsc --noEmit
-docker compose exec api pnpm exec biome lint client/src api/src
+claude -w fix-rounding            # Claude Code: worktree + setup, one per task
+scripts/agent/new.sh fix-rounding # any other agent: creates and sets up the worktree
+scripts/agent/prune.sh --list     # every worktree with its PR state and stack
+scripts/agent/prune.sh --yes      # remove worktrees (and stacks) whose PRs are merged
 ```
+
+Hooks keep agents out of this checkout. To let an agent work here, start it with
+`PAYPURE_PRIMARY=1 claude`.
 
 ## Layout (Tech §3)
 
-| Path | What |
-|---|---|
-| `packages/domain` | `@paypure/domain`: money (integer minor units, half-away rounding), currency table, rate resolution, line building and totals, `displayStatus()`, numbering, time zones, zod schemas. Tests cover every worked example in 07 §9 |
-| `api` | NestJS 11 on Fastify, Prisma 7 + Postgres 18. Modules: auth (argon2id, opaque DB sessions), catalog, time + timer, invoices (builder, drafts, send transaction, corrections, void, duplicate, payments), public/print, settings, live-sync events (pg_notify → LISTEN → SSE), outbox worker, PDF via Gotenberg |
+| Path                    | What                                                                                                                                                                                                                                                                                                                        |
+| ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `packages/domain`       | `@paypure/domain`: money (integer minor units, half-away rounding), currency table, rate resolution, line building and totals, `displayStatus()`, numbering, time zones, zod schemas. Tests cover every worked example in 07 §9                                                                                             |
+| `api`                   | NestJS 11 on Fastify, Prisma 7 + Postgres 18. Modules: auth (argon2id, opaque DB sessions), catalog, time + timer, invoices (builder, drafts, send transaction, corrections, void, duplicate, payments), public/print, settings, live-sync events (pg_notify → LISTEN → SSE), outbox worker, PDF via Gotenberg              |
 | `api/prisma/migrations` | Schema plus the rules Prisma can't express: one live timer per member, non-overlapping segments (btree_gist), fixed-fee and payment-account checks, line-maths check, and the immutability triggers (frozen versions, write-once PDFs and activity, billed-time guard). The app connects as `paypure_app`, a non-owner role |
-| `client` | Next.js 16 BFF: the browser only talks to Next; server components and Server Actions call the API. Every data commit is a real `<form>` (Guide §7) |
+| `client`                | Next.js 16 BFF: the browser only talks to Next; server components and Server Actions call the API. Every data commit is a real `<form>` (Guide §7)                                                                                                                                                                          |
 
 ## What works
 

@@ -51,7 +51,11 @@ export function toLocalTime(instant: Date | string, tz: string): string {
   return `${pad(t.getHours())}:${pad(t.getMinutes())}`;
 }
 
-export function formatTime(instant: Date | string, tz: string, format: "12h" | "24h" = "24h"): string {
+export function formatTime(
+  instant: Date | string,
+  tz: string,
+  format: "12h" | "24h" = "24h",
+): string {
   const hhmm = toLocalTime(instant, tz);
   if (format === "24h") return hhmm;
   const [h, m] = hhmm.split(":").map(Number);
@@ -72,7 +76,11 @@ export function fromWallTime(date: CalendarDate, hhmm: string, tz: string): Wall
   const [h, min] = hhmm.split(":").map(Number);
   const t = new TZDate(y, m - 1, d, h, min, 0, tz);
   if (t.getHours() !== h || t.getMinutes() !== min) {
-    return { ok: false, reason: "nonexistent", suggestion: `${pad(t.getHours())}:${pad(t.getMinutes())}` };
+    return {
+      ok: false,
+      reason: "nonexistent",
+      suggestion: `${pad(t.getHours())}:${pad(t.getMinutes())}`,
+    };
   }
   return { ok: true, instant: new Date(t.getTime()) };
 }
@@ -97,9 +105,7 @@ export function startOfWeek(date: CalendarDate, weekStart = 1): CalendarDate {
 export function daysBetween(a: CalendarDate, b: CalendarDate): number {
   const pa = parseDate(a);
   const pb = parseDate(b);
-  return Math.round(
-    (Date.UTC(pb.y, pb.m - 1, pb.d) - Date.UTC(pa.y, pa.m - 1, pa.d)) / 86400000,
-  );
+  return Math.round((Date.UTC(pb.y, pb.m - 1, pb.d) - Date.UTC(pa.y, pa.m - 1, pa.d)) / 86400000);
 }
 
 /** "16 Nov 2026" */

@@ -55,7 +55,8 @@ export class AuthGuard implements CanActivate {
     }
     const { workspace, ...member } = session.member;
     const headerTz = req.headers["x-timezone"];
-    const tz = typeof headerTz === "string" && isValidTimeZone(headerTz) ? headerTz : member.timeZone;
+    const tz =
+      typeof headerTz === "string" && isValidTimeZone(headerTz) ? headerTz : member.timeZone;
     const ctx: Ctx = {
       member: member as Member,
       workspace,

@@ -20,7 +20,16 @@ export default async function InvitePage({ params }: { params: Promise<{ token: 
               <label className="label" htmlFor="password">
                 New password
               </label>
-              <input id="password" name="password" type="password" minLength={8} className="input" autoComplete="new-password" required autoFocus />
+              <input
+                id="password"
+                name="password"
+                type="password"
+                minLength={8}
+                className="input"
+                autoComplete="new-password"
+                required
+                autoFocus
+              />
               <p className="hint">At least 8 characters.</p>
               <FieldError name="password" />
             </div>

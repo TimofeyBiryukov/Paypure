@@ -6,7 +6,9 @@ import { TEMPLATE_VERSION } from "./invoice-ops";
 
 /** Signed print URLs (Tech §5.5): the signature is required, but not treated as enough alone. */
 export function signPrint(versionId: string, exp: number, wm: boolean): string {
-  return createHmac("sha256", env.PRINT_SIGNING_SECRET).update(`${versionId}.${exp}.${wm ? 1 : 0}`).digest("hex");
+  return createHmac("sha256", env.PRINT_SIGNING_SECRET)
+    .update(`${versionId}.${exp}.${wm ? 1 : 0}`)
+    .digest("hex");
 }
 
 export function verifyPrint(versionId: string, exp: number, wm: boolean, sig: string): boolean {
@@ -54,16 +56,29 @@ export class PdfService {
 
   /** Store the PDF of a frozen version once (idempotent: version_id is the PK). */
   async ensureStored(versionId: string): Promise<boolean> {
-    const existing = await this.prisma.invoiceFile.findUnique({ where: { versionId }, select: { versionId: true } });
+    const existing = await this.prisma.invoiceFile.findUnique({
+      where: { versionId },
+      select: { versionId: true },
+    });
     if (existing) return true;
     const bytes = await this.renderVersion(versionId);
     const sha256 = createHash("sha256").update(bytes).digest("hex");
     await this.prisma.invoiceFile
-      .create({ data: { versionId, pdf: new Uint8Array(bytes), sha256, bytes: bytes.length, templateVersion: TEMPLATE_VERSION } })
+      .create({
+        data: {
+          versionId,
+          pdf: new Uint8Array(bytes),
+          sha256,
+          bytes: bytes.length,
+          templateVersion: TEMPLATE_VERSION,
+        },
+      })
       .catch((e) => {
         if (!String(e).includes("Unique constraint")) throw e;
       });
-    this.log.log(`stored PDF for version ${versionId} (${bytes.length} bytes, ${sha256.slice(0, 12)})`);
+    this.log.log(
+      `stored PDF for version ${versionId} (${bytes.length} bytes, ${sha256.slice(0, 12)})`,
+    );
     return true;
   }
 

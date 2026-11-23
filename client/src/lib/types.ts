@@ -23,7 +23,14 @@ export interface TimerSnapshot {
   note: string;
   billable: boolean;
   version: number;
-  task: { id: string; name: string; billingMode: string; projectName: string; clientName: string; colour: number } | null;
+  task: {
+    id: string;
+    name: string;
+    billingMode: string;
+    projectName: string;
+    clientName: string;
+    colour: number;
+  } | null;
   segments: { startedAt: string; endedAt: string | null }[];
   workedSecondsClosed: number;
   openSince: string | null;

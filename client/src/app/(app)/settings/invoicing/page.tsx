@@ -19,7 +19,11 @@ interface InvoicingSettings {
     defaultNotes: string;
   };
   taxes: { id: string; name: string; rateBp: number }[];
-  templates: { kind: "invoice" | "correction" | "reminder" | "thank_you"; subject: string; body: string }[];
+  templates: {
+    kind: "invoice" | "correction" | "reminder" | "thank_you";
+    subject: string;
+    body: string;
+  }[];
   numbering: { next: number; maxUsed: number; preview: string };
 }
 
@@ -30,13 +34,31 @@ const TEMPLATE_LABELS = {
   thank_you: "Thank-you",
 } as const;
 
-const VARIABLES = ["number", "client_name", "total", "balance", "due_date", "link", "business_name", "sender_name", "changes_summary", "days_overdue", "paid", "rev"];
+const VARIABLES = [
+  "number",
+  "client_name",
+  "total",
+  "balance",
+  "due_date",
+  "link",
+  "business_name",
+  "sender_name",
+  "changes_summary",
+  "days_overdue",
+  "paid",
+  "rev",
+];
 
 /** Settings · Invoicing (S16): defaults, numbering (08 §6), taxes (07 §7), email templates. */
 export default async function InvoicingPage() {
   const me = (await getMe())!;
   if (!me.isAdmin) redirect("/settings/profile");
-  const { workspace: ws, taxes, templates, numbering } = await api<InvoicingSettings>("/v1/settings/workspace");
+  const {
+    workspace: ws,
+    taxes,
+    templates,
+    numbering,
+  } = await api<InvoicingSettings>("/v1/settings/workspace");
   return (
     <div className="space-y-6">
       <section className="card p-6">
@@ -52,7 +74,9 @@ export default async function InvoicingPage() {
                   <option key={c}>{c}</option>
                 ))}
               </select>
-              <p className="hint">New clients start in this currency. The default rate is in it too.</p>
+              <p className="hint">
+                New clients start in this currency. The default rate is in it too.
+              </p>
             </div>
             <div>
               <label className="label" htmlFor="f-timeZone">
@@ -69,14 +93,30 @@ export default async function InvoicingPage() {
             <Field
               name="defaultRate"
               label={`Default hourly rate (${ws.currency})`}
-              defaultValue={ws.defaultRateMinor == null ? "" : minorToDecimalString(ws.defaultRateMinor, ws.currency)}
+              defaultValue={
+                ws.defaultRateMinor == null
+                  ? ""
+                  : minorToDecimalString(ws.defaultRateMinor, ws.currency)
+              }
               inputMode="decimal"
               placeholder="No default"
               hint="Applies only to clients in the workspace currency with no rate of their own."
             />
-            <Field name="defaultTermsDays" label="Payment terms (days)" type="number" defaultValue={ws.defaultTermsDays} required />
+            <Field
+              name="defaultTermsDays"
+              label="Payment terms (days)"
+              type="number"
+              defaultValue={ws.defaultTermsDays}
+              required
+            />
           </div>
-          <Field name="defaultNotes" label="Default notes" defaultValue={ws.defaultNotes} textarea hint="Printed in the Notes block of new drafts." />
+          <Field
+            name="defaultNotes"
+            label="Default notes"
+            defaultValue={ws.defaultNotes}
+            textarea
+            hint="Printed in the Notes block of new drafts."
+          />
           <Submit pendingText="Saving…">Save defaults</Submit>
         </ActionForm>
       </section>
@@ -107,11 +147,21 @@ export default async function InvoicingPage() {
             <legend className="label">Reset the sequence</legend>
             <div className="seg">
               <label>
-                <input type="radio" name="numberReset" value="never" defaultChecked={ws.numberReset === "never"} />
+                <input
+                  type="radio"
+                  name="numberReset"
+                  value="never"
+                  defaultChecked={ws.numberReset === "never"}
+                />
                 Never
               </label>
               <label>
-                <input type="radio" name="numberReset" value="yearly" defaultChecked={ws.numberReset === "yearly"} />
+                <input
+                  type="radio"
+                  name="numberReset"
+                  value="yearly"
+                  defaultChecked={ws.numberReset === "yearly"}
+                />
                 Every year
               </label>
             </div>
@@ -125,7 +175,9 @@ export default async function InvoicingPage() {
 
       <section className="card p-6">
         <h2 className="t-title-2 mb-1">Default taxes</h2>
-        <p className="text-muted mb-4">Copied onto new drafts. Taxes are added on top and never compound.</p>
+        <p className="text-muted mb-4">
+          Copied onto new drafts. Taxes are added on top and never compound.
+        </p>
         <ul className="divide-y divide-[var(--border)] border-y border-line mb-4">
           {taxes.map((t) => (
             <li key={t.id} className="flex items-center gap-3 py-2">
@@ -137,7 +189,9 @@ export default async function InvoicingPage() {
               </ActionForm>
             </li>
           ))}
-          {taxes.length === 0 && <li className="py-3 text-muted">No taxes. Drafts start without tax.</li>}
+          {taxes.length === 0 && (
+            <li className="py-3 text-muted">No taxes. Drafts start without tax.</li>
+          )}
         </ul>
         {/* Inline add row: a small form, Enter submits (Guide §7.1) */}
         <ActionForm action={addTax} reset className="flex flex-wrap items-end gap-3">
@@ -152,7 +206,14 @@ export default async function InvoicingPage() {
             <label className="label" htmlFor="tax-rate">
               Rate %
             </label>
-            <input id="tax-rate" name="rate" className="input" inputMode="decimal" placeholder="20" required />
+            <input
+              id="tax-rate"
+              name="rate"
+              className="input"
+              inputMode="decimal"
+              placeholder="20"
+              required
+            />
             <FieldError name="rate" />
           </div>
           <Submit className="btn btn-secondary" pendingText="Adding…">
@@ -176,8 +237,21 @@ export default async function InvoicingPage() {
             <summary className="t-title-3 cursor-pointer">{TEMPLATE_LABELS[t.kind]}</summary>
             <ActionForm action={updateTemplate} className="space-y-3 pt-3">
               <input type="hidden" name="kind" value={t.kind} />
-              <Field idPrefix={`tpl-${t.kind}`} name="subject" label="Subject" defaultValue={t.subject} required />
-              <Field idPrefix={`tpl-${t.kind}`} name="body" label="Message" defaultValue={t.body} textarea rows={8} />
+              <Field
+                idPrefix={`tpl-${t.kind}`}
+                name="subject"
+                label="Subject"
+                defaultValue={t.subject}
+                required
+              />
+              <Field
+                idPrefix={`tpl-${t.kind}`}
+                name="body"
+                label="Message"
+                defaultValue={t.body}
+                textarea
+                rows={8}
+              />
               <Submit pendingText="Saving…">Save template</Submit>
             </ActionForm>
           </details>

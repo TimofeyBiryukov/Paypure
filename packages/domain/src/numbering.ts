@@ -6,7 +6,9 @@ import { type CalendarDate, parseDate } from "./time";
 export function formatInvoiceNumber(format: string, seq: number, issueDate: CalendarDate): string {
   const { y } = parseDate(issueDate);
   return format
-    .replace(/\{seq(?::(\d+))?\}/g, (_, n) => (n ? String(seq).padStart(Number(n), "0") : String(seq)))
+    .replace(/\{seq(?::(\d+))?\}/g, (_, n) =>
+      n ? String(seq).padStart(Number(n), "0") : String(seq),
+    )
     .replace(/\{YYYY\}/g, String(y))
     .replace(/\{YY\}/g, String(y).slice(-2));
 }

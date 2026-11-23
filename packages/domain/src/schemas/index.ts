@@ -83,7 +83,12 @@ export const TimeEntryInput = z.object({
   tz: z.string().optional(),
   /** either segments (start–end mode) or durationSeconds (duration mode) */
   segments: z.array(SegmentInput).min(1).max(50).optional(),
-  durationSeconds: z.number().int().min(1).max(86400 * 2).optional(),
+  durationSeconds: z
+    .number()
+    .int()
+    .min(1)
+    .max(86400 * 2)
+    .optional(),
   note: z.string().max(5000).default(""),
   billable: z.boolean().optional(),
   version: z.number().int().optional(),
@@ -133,7 +138,13 @@ export const DraftUpdateInput = z.object({
   paymentAccountId: id.nullable().optional(),
   lines: z.array(DraftLineInput).max(2000).optional(),
   taxes: z
-    .array(z.object({ id: z.string().optional(), name: z.string().min(1).max(50), rateBp: z.number().int().min(0).max(10000) }))
+    .array(
+      z.object({
+        id: z.string().optional(),
+        name: z.string().min(1).max(50),
+        rateBp: z.number().int().min(0).max(10000),
+      }),
+    )
     .max(10)
     .optional(),
   changeSummary: z.string().max(2000).optional(),

@@ -36,7 +36,13 @@ export function ColourPicker({ value }: { value?: number }) {
       <div className="flex gap-2 flex-wrap">
         {Array.from({ length: 10 }, (_, i) => (
           <label key={i} className="cursor-pointer">
-            <input type="radio" name="colour" value={i} defaultChecked={value === i} className="peer sr-only" />
+            <input
+              type="radio"
+              name="colour"
+              value={i}
+              defaultChecked={value === i}
+              className="peer sr-only"
+            />
             <span
               className="block w-7 h-7 rounded-[4px] peer-checked:ring-2 peer-checked:ring-offset-2 peer-focus-visible:ring-2 ring-[var(--accent)]"
               style={{ background: `var(--c${i})` }}
@@ -51,7 +57,13 @@ export function ColourPicker({ value }: { value?: number }) {
 
 export function CurrencySelect({ value, disabled }: { value: string; disabled?: boolean }) {
   return (
-    <select id="f-currency" name="currency" className="select" defaultValue={value} disabled={disabled}>
+    <select
+      id="f-currency"
+      name="currency"
+      className="select"
+      defaultValue={value}
+      disabled={disabled}
+    >
       {CURRENCY_CODES.map((c) => (
         <option key={c} value={c}>
           {c}

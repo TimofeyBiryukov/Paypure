@@ -74,15 +74,35 @@ export function Palette({ catalog, isAdmin }: { catalog: Catalog; isAdmin: boole
       .filter((t) => tokens.length > 0 && match(`${t.clientName} ${t.projectName} ${t.name}`))
       .slice(0, 6)
       .flatMap<Item>((t) => [
-        { kind: "start", label: `Start timer on ${t.name}`, taskId: t.id, sub: `${t.clientName} / ${t.projectName}`, colour: t.colour, client: t.clientName },
-        { kind: "log", label: `Log time on ${t.name}`, taskId: t.id, sub: `${t.clientName} / ${t.projectName}` },
+        {
+          kind: "start",
+          label: `Start timer on ${t.name}`,
+          taskId: t.id,
+          sub: `${t.clientName} / ${t.projectName}`,
+          colour: t.colour,
+          client: t.clientName,
+        },
+        {
+          kind: "log",
+          label: `Log time on ${t.name}`,
+          taskId: t.id,
+          sub: `${t.clientName} / ${t.projectName}`,
+        },
       ]);
     const clients = catalog.clients
       .filter((c) => tokens.length > 0 && match(c.name))
       .slice(0, 4)
       .flatMap<Item>((c) => [
         { kind: "go", label: c.name, href: `/clients/${c.id}`, hint: "Client" },
-        ...(isAdmin ? ([{ kind: "go", label: `New invoice for ${c.name}`, href: `/invoices/new?client=${c.id}` }] as Item[]) : []),
+        ...(isAdmin
+          ? ([
+              {
+                kind: "go",
+                label: `New invoice for ${c.name}`,
+                href: `/invoices/new?client=${c.id}`,
+              },
+            ] as Item[])
+          : []),
       ]);
     const filteredPages = pages.filter((p) => tokens.length === 0 || match(p.label));
     // Typing a task name offers Start and Log time directly (S17).
@@ -106,21 +126,41 @@ export function Palette({ catalog, isAdmin }: { catalog: Catalog; isAdmin: boole
     const r: ActionState = await startTimer(null, fd);
     setOpen(false);
     if (r?.ok) {
-      window.dispatchEvent(new CustomEvent("pp:timer", { detail: (r.data as { timer?: unknown })?.timer ?? null }));
+      window.dispatchEvent(
+        new CustomEvent("pp:timer", { detail: (r.data as { timer?: unknown })?.timer ?? null }),
+      );
       if (r.toast) push(r.toast);
     } else if (r?.error) push({ text: r.error, tone: "danger" });
   };
 
   return (
     <>
-      <button type="button" className="btn btn-ghost btn-icon hidden sm:inline-flex" aria-label="Command palette (⌘K)" title="⌘K" onClick={() => setOpen(true)}>
+      <button
+        type="button"
+        className="btn btn-ghost btn-icon hidden sm:inline-flex"
+        aria-label="Command palette (⌘K)"
+        title="⌘K"
+        onClick={() => setOpen(true)}
+      >
         <Search size={16} />
       </button>
-      <dialog ref={dialog} className="dialog" style={{ marginTop: "12vh" }} onClose={() => setOpen(false)} aria-label="Command palette">
+      <dialog
+        ref={dialog}
+        className="dialog"
+        style={{ marginTop: "12vh" }}
+        onClose={() => setOpen(false)}
+        aria-label="Command palette"
+      >
         <form ref={formRef} action={onStart} className="contents">
           <input ref={taskInput} type="hidden" name="taskId" />
         </form>
-        <form role="search" onSubmit={(e) => { e.preventDefault(); if (items[active]) choose(items[active]); }}>
+        <form
+          role="search"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (items[active]) choose(items[active]);
+          }}
+        >
           <label className="sr-only" htmlFor="palette-q">
             Search
           </label>
@@ -165,7 +205,11 @@ export function Palette({ catalog, isAdmin }: { catalog: Catalog; isAdmin: boole
               }}
               onKeyDown={() => {}}
             >
-              {it.kind === "start" ? <ClientBadge name={it.client} colour={it.colour} size={20} /> : <span className="w-5" />}
+              {it.kind === "start" ? (
+                <ClientBadge name={it.client} colour={it.colour} size={20} />
+              ) : (
+                <span className="w-5" />
+              )}
               <span className="flex-1 min-w-0">
                 <span className="block truncate">{it.label}</span>
                 {"sub" in it && <span className="t-caption">{it.sub}</span>}
@@ -174,7 +218,9 @@ export function Palette({ catalog, isAdmin }: { catalog: Catalog; isAdmin: boole
               {it.kind === "go" && it.hint && <span className="t-caption">{it.hint}</span>}
             </li>
           ))}
-          {items.length === 0 && <li className="px-3 py-6 text-center text-muted">Nothing matches “{q}”.</li>}
+          {items.length === 0 && (
+            <li className="px-3 py-6 text-center text-muted">Nothing matches “{q}”.</li>
+          )}
         </ul>
       </dialog>
     </>

@@ -80,8 +80,14 @@ export class TimeController {
               colour: e.task.project.client.colour,
             }
           : null,
-        segments: e.segments.map((s) => ({ startedAt: s.startedAt.toISOString(), endedAt: s.endedAt?.toISOString() ?? null })),
-        workedSecondsClosed: closed.reduce((s, x) => s + secondsBetween(x.startedAt, x.endedAt as Date), 0),
+        segments: e.segments.map((s) => ({
+          startedAt: s.startedAt.toISOString(),
+          endedAt: s.endedAt?.toISOString() ?? null,
+        })),
+        workedSecondsClosed: closed.reduce(
+          (s, x) => s + secondsBetween(x.startedAt, x.endedAt as Date),
+          0,
+        ),
         openSince: open?.startedAt.toISOString() ?? null,
         firstStartedAt: e.segments[0]?.startedAt.toISOString() ?? null,
       },
@@ -98,7 +104,13 @@ export class TimeController {
       entity: entryId ?? undefined,
       timer: snap.entry,
     });
-    await this.events.emit(tx, { ws: ctx.workspace.id, member: ctx.member.id, topic: "time", action, entity: entryId ?? undefined });
+    await this.events.emit(tx, {
+      ws: ctx.workspace.id,
+      member: ctx.member.id,
+      topic: "time",
+      action,
+      entity: entryId ?? undefined,
+    });
   }
 
   @Get("timer")
@@ -112,10 +124,16 @@ export class TimeController {
 
   /** Close the open segment and recompute the cache columns (invariant 2, 06 §2.3). */
   private async finalize(tx: Tx, entryId: string, state: "paused" | "stopped", now: Date) {
-    await tx.timeEntrySegment.updateMany({ where: { timeEntryId: entryId, endedAt: null }, data: { endedAt: now } });
+    await tx.timeEntrySegment.updateMany({
+      where: { timeEntryId: entryId, endedAt: null },
+      data: { endedAt: now },
+    });
     // A zero-length segment would violate segment_positive; drop it instead.
     await tx.$executeRaw`DELETE FROM time_entry_segments WHERE time_entry_id = ${entryId}::uuid AND ended_at <= started_at`;
-    const segs = await tx.timeEntrySegment.findMany({ where: { timeEntryId: entryId }, orderBy: { startedAt: "asc" } });
+    const segs = await tx.timeEntrySegment.findMany({
+      where: { timeEntryId: entryId },
+      orderBy: { startedAt: "asc" },
+    });
     const duration = segs.reduce((s, x) => s + secondsBetween(x.startedAt, x.endedAt as Date), 0);
     await tx.timeEntry.update({
       where: { id: entryId },
@@ -137,7 +155,9 @@ export class TimeController {
     });
     if (!live) return null;
     if (!live.taskId) {
-      throw conflict("needs_task", "Choose a task for the running timer first, or discard it.", { entryId: live.id });
+      throw conflict("needs_task", "Choose a task for the running timer first, or discard it.", {
+        entryId: live.id,
+      });
     }
     const prevState = live.state;
     await this.finalize(tx, live.id, "stopped", now);
@@ -154,7 +174,9 @@ export class TimeController {
         const now = truncSec(new Date());
         let task = null;
         if (input.taskId) {
-          task = await tx.task.findFirst({ where: { id: input.taskId, workspaceId: ctx.workspace.id } });
+          task = await tx.task.findFirst({
+            where: { id: input.taskId, workspaceId: ctx.workspace.id },
+          });
           if (!task) throw notFound("Task not found");
         }
         const stopped = await this.stopLive(tx, ctx, now);
@@ -183,7 +205,11 @@ export class TimeController {
         });
         await this.emitTimer(tx, ctx, "started", entry.id);
         const snap = await this.snapshot(tx, entry.id);
-        return { ...snap, stoppedEntryId: stopped?.id ?? null, stoppedPrevState: stopped?.prevState ?? null };
+        return {
+          ...snap,
+          stoppedEntryId: stopped?.id ?? null,
+          stoppedPrevState: stopped?.prevState ?? null,
+        };
       });
     try {
       return await run();
@@ -222,7 +248,10 @@ export class TimeController {
       const lastEnd = e.segments[0]?.endedAt ?? e.startedAt ?? now;
       // Paused across midnight: stop yesterday's entry and start a new one (06 §2.6).
       if (toLocalDate(now, e.timeZone) !== toLocalDate(lastEnd, e.timeZone)) {
-        if (!e.taskId) throw conflict("needs_task", "Choose a task for yesterday's timer first.", { entryId: e.id });
+        if (!e.taskId)
+          throw conflict("needs_task", "Choose a task for yesterday's timer first.", {
+            entryId: e.id,
+          });
         await this.finalize(tx, e.id, "stopped", now);
         const fresh = await tx.timeEntry.create({
           data: {
@@ -240,8 +269,13 @@ export class TimeController {
         await this.emitTimer(tx, ctx, "started", fresh.id);
         return { ...(await this.snapshot(tx, fresh.id)), newDay: true, previousEntryId: e.id };
       }
-      await tx.timeEntry.update({ where: { id }, data: { state: "running", endedAt: null, version: { increment: 1 } } });
-      await tx.timeEntrySegment.create({ data: { workspaceId: ctx.workspace.id, timeEntryId: id, startedAt: now } });
+      await tx.timeEntry.update({
+        where: { id },
+        data: { state: "running", endedAt: null, version: { increment: 1 } },
+      });
+      await tx.timeEntrySegment.create({
+        data: { workspaceId: ctx.workspace.id, timeEntryId: id, startedAt: now },
+      });
       await this.emitTimer(tx, ctx, "resumed", id);
       return this.snapshot(tx, id);
     });
@@ -284,7 +318,11 @@ export class TimeController {
   /** Undo for "start another" / "stop": restore an entry to its previous live state. */
   @Post("timer/:id/restore")
   @HttpCode(200)
-  async restoreTimer(@C() ctx: Ctx, @Param("id") id: string, @Body() body: { state?: "running" | "paused"; discardId?: string }) {
+  async restoreTimer(
+    @C() ctx: Ctx,
+    @Param("id") id: string,
+    @Body() body: { state?: "running" | "paused"; discardId?: string },
+  ) {
     return this.prisma.$transaction(async (tx) => {
       if (body.discardId) {
         await tx.timeEntry.updateMany({
@@ -296,13 +334,21 @@ export class TimeController {
       if (!e || e.invoiceId || e.offInvoice) return { entry: null, applied: false };
       try {
         if (e.deletedAt) {
-          await tx.timeEntry.update({ where: { id }, data: { deletedAt: null, version: { increment: 1 } } });
+          await tx.timeEntry.update({
+            where: { id },
+            data: { deletedAt: null, version: { increment: 1 } },
+          });
         } else if (e.state === "stopped") {
           const now = truncSec(new Date());
           const target = body.state ?? "running";
-          await tx.timeEntry.update({ where: { id }, data: { state: target, endedAt: null, version: { increment: 1 } } });
+          await tx.timeEntry.update({
+            where: { id },
+            data: { state: target, endedAt: null, version: { increment: 1 } },
+          });
           if (target === "running") {
-            await tx.timeEntrySegment.create({ data: { workspaceId: ctx.workspace.id, timeEntryId: id, startedAt: now } });
+            await tx.timeEntrySegment.create({
+              data: { workspaceId: ctx.workspace.id, timeEntryId: id, startedAt: now },
+            });
           }
         }
       } catch (err) {
@@ -327,11 +373,14 @@ export class TimeController {
       if (!e) return this.snapshot(tx, id, false);
       const data: Prisma.TimeEntryUpdateInput = { version: { increment: 1 } };
       if ("taskId" in input && input.taskId) {
-        const task = await tx.task.findFirst({ where: { id: input.taskId, workspaceId: ctx.workspace.id } });
+        const task = await tx.task.findFirst({
+          where: { id: input.taskId, workspaceId: ctx.workspace.id },
+        });
         if (!task) throw notFound("Task not found");
         data.task = { connect: { id: task.id } };
         // billable is re-derived from the mode when a task is first set (06 §2.7)
-        if (!e.taskId || input.billable === undefined) data.billable = task.billingMode === "hourly";
+        if (!e.taskId || input.billable === undefined)
+          data.billable = task.billingMode === "hourly";
       }
       if (input.note !== undefined) data.note = input.note;
       if (input.billable !== undefined) data.billable = input.billable;
@@ -340,7 +389,8 @@ export class TimeController {
         const at = truncSec(new Date(input.startedAt));
         const limit = first?.endedAt ?? new Date();
         if (at >= limit) throw invalid("The start must be before the timer's first break or now.");
-        if (first) await tx.timeEntrySegment.update({ where: { id: first.id }, data: { startedAt: at } });
+        if (first)
+          await tx.timeEntrySegment.update({ where: { id: first.id }, data: { startedAt: at } });
         data.startedAt = at;
         data.date = s2d(toLocalDate(at, e.timeZone));
         await this.recomputeDuration(tx, id);
@@ -352,10 +402,17 @@ export class TimeController {
   }
 
   private async recomputeDuration(tx: Tx, id: string) {
-    const segs = await tx.timeEntrySegment.findMany({ where: { timeEntryId: id, endedAt: { not: null } } });
+    const segs = await tx.timeEntrySegment.findMany({
+      where: { timeEntryId: id, endedAt: { not: null } },
+    });
     await tx.timeEntry.update({
       where: { id },
-      data: { durationSeconds: segs.reduce((s, x) => s + secondsBetween(x.startedAt, x.endedAt as Date), 0) },
+      data: {
+        durationSeconds: segs.reduce(
+          (s, x) => s + secondsBetween(x.startedAt, x.endedAt as Date),
+          0,
+        ),
+      },
     });
   }
 
@@ -372,17 +429,27 @@ export class TimeController {
     @Query("state") state?: string,
     @Query("invoice") invoice?: string,
   ) {
-    const memberId = member === "all" && ctx.isAdmin ? undefined : member && ctx.isAdmin ? member : ctx.member.id;
+    const memberId =
+      member === "all" && ctx.isAdmin ? undefined : member && ctx.isAdmin ? member : ctx.member.id;
     const where: Prisma.TimeEntryWhereInput = {
       workspaceId: ctx.workspace.id,
       deletedAt: null,
       ...(memberId ? { memberId } : {}),
-      ...(from && isCalendarDate(from) ? { date: { gte: s2d(from), ...(to && isCalendarDate(to) ? { lte: s2d(to) } : {}) } } : {}),
+      ...(from && isCalendarDate(from)
+        ? { date: { gte: s2d(from), ...(to && isCalendarDate(to) ? { lte: s2d(to) } : {}) } }
+        : {}),
       ...(client ? { task: { project: { clientId: client } } } : {}),
       ...(project ? { task: { projectId: project } } : {}),
       ...(invoice && ctx.isAdmin ? { invoiceId: invoice } : {}),
     };
-    if (state === "unbilled") Object.assign(where, { invoiceId: null, offInvoice: null, billable: true, state: "stopped", task: { ...(where.task as object), billingMode: "hourly" } });
+    if (state === "unbilled")
+      Object.assign(where, {
+        invoiceId: null,
+        offInvoice: null,
+        billable: true,
+        state: "stopped",
+        task: { ...(where.task as object), billingMode: "hourly" },
+      });
     if (state === "billed") where.invoiceId = { not: null };
     if (state === "billed_elsewhere") where.offInvoice = "billed_elsewhere";
     if (state === "written_off") where.offInvoice = "written_off";
@@ -392,7 +459,14 @@ export class TimeController {
         segments: { orderBy: { startedAt: "asc" } },
         task: taskInclude,
         member: { select: { id: true, name: true } },
-        invoice: { select: { id: true, number: true, status: true, versions: { where: { frozenAt: null }, select: { id: true } } } },
+        invoice: {
+          select: {
+            id: true,
+            number: true,
+            status: true,
+            versions: { where: { frozenAt: null }, select: { id: true } },
+          },
+        },
         changes: { where: { version: { frozenAt: null } }, select: { id: true } },
       },
       orderBy: [{ date: "desc" }, { startedAt: "asc" }, { createdAt: "asc" }],
@@ -422,7 +496,10 @@ export class TimeController {
         startedAt: e.startedAt?.toISOString() ?? null,
         endedAt: e.endedAt?.toISOString() ?? null,
         durationSeconds: e.durationSeconds,
-        segments: e.segments.map((s) => ({ startedAt: s.startedAt.toISOString(), endedAt: s.endedAt?.toISOString() ?? null })),
+        segments: e.segments.map((s) => ({
+          startedAt: s.startedAt.toISOString(),
+          endedAt: s.endedAt?.toISOString() ?? null,
+        })),
         note: e.note,
         billable: e.billable,
         version: e.version,
@@ -440,7 +517,9 @@ export class TimeController {
               currency: e.task.project.client.currency,
             }
           : null,
-        invoice: e.invoice ? { id: e.invoice.id, number: e.invoice.number, status: e.invoice.status } : null,
+        invoice: e.invoice
+          ? { id: e.invoice.id, number: e.invoice.number, status: e.invoice.status }
+          : null,
         offInvoice: e.offInvoice,
         offInvoiceRef: e.offInvoiceRef,
         changePending: e.changes.length > 0,
@@ -455,17 +534,24 @@ export class TimeController {
       include: { segments: { orderBy: { startedAt: "asc" } }, invoice: true },
     });
     if (!e) throw notFound("Time entry not found");
-    if (e.memberId !== ctx.member.id && !ctx.isAdmin) throw forbidden("You can only change your own time.");
+    if (e.memberId !== ctx.member.id && !ctx.isAdmin)
+      throw forbidden("You can only change your own time.");
     return e;
   }
 
   /** Validate and normalise segments (06 §2.9): ordered, positive, no overlap. */
   private normaliseSegments(segs: { startedAt: string; endedAt: string }[]) {
     const out = segs
-      .map((s) => ({ startedAt: truncSec(new Date(s.startedAt)), endedAt: truncSec(new Date(s.endedAt)) }))
+      .map((s) => ({
+        startedAt: truncSec(new Date(s.startedAt)),
+        endedAt: truncSec(new Date(s.endedAt)),
+      }))
       .sort((a, b) => a.startedAt.getTime() - b.startedAt.getTime());
     for (let i = 0; i < out.length; i++) {
-      if (out[i].endedAt <= out[i].startedAt) throw invalid("Each end must be after its start.", { fields: { end: "End is before start" } });
+      if (out[i].endedAt <= out[i].startedAt)
+        throw invalid("Each end must be after its start.", {
+          fields: { end: "End is before start" },
+        });
       if (i > 0 && out[i].startedAt < out[i - 1].endedAt) throw invalid("Breaks can't overlap.");
     }
     return out;
@@ -477,11 +563,15 @@ export class TimeController {
     const memberId = input.memberId && ctx.isAdmin ? input.memberId : ctx.member.id;
     const tz = input.tz && isValidTimeZone(input.tz) ? input.tz : ctx.tz;
     return this.prisma.$transaction(async (tx) => {
-      const task = await tx.task.findFirst({ where: { id: input.taskId, workspaceId: ctx.workspace.id } });
+      const task = await tx.task.findFirst({
+        where: { id: input.taskId, workspaceId: ctx.workspace.id },
+      });
       if (!task) throw notFound("Task not found");
       const segs = input.segments ? this.normaliseSegments(input.segments) : null;
       if (!segs && !input.durationSeconds) throw invalid("Enter a duration or a start and end.");
-      const duration = segs ? segs.reduce((s, x) => s + secondsBetween(x.startedAt, x.endedAt), 0) : (input.durationSeconds as number);
+      const duration = segs
+        ? segs.reduce((s, x) => s + secondsBetween(x.startedAt, x.endedAt), 0)
+        : (input.durationSeconds as number);
       const e = await tx.timeEntry.create({
         data: {
           workspaceId: ctx.workspace.id,
@@ -496,10 +586,18 @@ export class TimeController {
           durationSeconds: duration,
           note: input.note,
           billable: task.billingMode === "hourly" ? (input.billable ?? true) : false,
-          ...(segs ? { segments: { create: segs.map((s) => ({ ...s, workspaceId: ctx.workspace.id })) } } : {}),
+          ...(segs
+            ? { segments: { create: segs.map((s) => ({ ...s, workspaceId: ctx.workspace.id })) } }
+            : {}),
         },
       });
-      await this.events.emit(tx, { ws: ctx.workspace.id, member: memberId, topic: "time", action: "created", entity: e.id });
+      await this.events.emit(tx, {
+        ws: ctx.workspace.id,
+        member: memberId,
+        topic: "time",
+        action: "created",
+        entity: e.id,
+      });
       return { id: e.id };
     });
   }
@@ -513,7 +611,9 @@ export class TimeController {
       if (input.version !== undefined && input.version !== e.version) {
         throw conflict("version_conflict", "Changed on another device. Reload to see the latest.");
       }
-      const task = await tx.task.findFirst({ where: { id: input.taskId, workspaceId: ctx.workspace.id } });
+      const task = await tx.task.findFirst({
+        where: { id: input.taskId, workspaceId: ctx.workspace.id },
+      });
       if (!task) throw notFound("Task not found");
       const segs = input.segments ? this.normaliseSegments(input.segments) : null;
       const duration = segs
@@ -531,15 +631,36 @@ export class TimeController {
 
       // Billed on an issued invoice → stage the change on the correction (08 §5.2).
       if (e.invoice?.status === "issued") {
-        if (!ctx.isAdmin) throw forbidden("This time is on a sent invoice. Ask an admin to propose a change.");
-        const current = await tx.invoiceVersion.findUnique({ where: { id: e.invoice.currentVersionId as string } });
+        if (!ctx.isAdmin)
+          throw forbidden("This time is on a sent invoice. Ask an admin to propose a change.");
+        const current = await tx.invoiceVersion.findUnique({
+          where: { id: e.invoice.currentVersionId as string },
+        });
         const changed = diffEntry(e, next);
         if (changed.length === 0) return { ok: true, staged: false };
-        if (!affectsDocument(changed.map(snake), (current?.lineLayout as unknown as LineLayout) ?? { mode: "per_task", showDates: true, showNotes: false })) {
+        if (
+          !affectsDocument(
+            changed.map(snake),
+            (current?.lineLayout as unknown as LineLayout) ?? {
+              mode: "per_task",
+              showDates: true,
+              showNotes: false,
+            },
+          )
+        ) {
           // Not printed (e.g. a note under a layout that doesn't show notes): save normally.
           await tx.$executeRaw`SELECT set_config('paypure.applying_version', 'note-only', true)`;
-          await tx.timeEntry.update({ where: { id }, data: { note: next.note, version: { increment: 1 } } });
-          await this.events.emit(tx, { ws: ctx.workspace.id, member: e.memberId, topic: "time", action: "updated", entity: id });
+          await tx.timeEntry.update({
+            where: { id },
+            data: { note: next.note, version: { increment: 1 } },
+          });
+          await this.events.emit(tx, {
+            ws: ctx.workspace.id,
+            member: e.memberId,
+            topic: "time",
+            action: "updated",
+            entity: id,
+          });
           return { ok: true, staged: false };
         }
         const version = await this.openCorrection(tx, ctx, e.invoice.id);
@@ -549,23 +670,58 @@ export class TimeController {
             versionId: version.id,
             timeEntryId: id,
             op: task.id !== e.taskId ? "move" : "update",
-            changes: Object.fromEntries(changed.map((k) => [k, [ (e as Record<string, unknown>)[k] instanceof Date ? ((e as Record<string, unknown>)[k] as Date).toISOString() : (e as Record<string, unknown>)[k], (next as Record<string, unknown>)[k]]])) as Prisma.InputJsonValue,
-            segments: segs ? (segs.map((s) => ({ startedAt: s.startedAt.toISOString(), endedAt: s.endedAt.toISOString() })) as Prisma.InputJsonValue) : Prisma.DbNull,
+            changes: Object.fromEntries(
+              changed.map((k) => [
+                k,
+                [
+                  (e as Record<string, unknown>)[k] instanceof Date
+                    ? ((e as Record<string, unknown>)[k] as Date).toISOString()
+                    : (e as Record<string, unknown>)[k],
+                  (next as Record<string, unknown>)[k],
+                ],
+              ]),
+            ) as Prisma.InputJsonValue,
+            segments: segs
+              ? (segs.map((s) => ({
+                  startedAt: s.startedAt.toISOString(),
+                  endedAt: s.endedAt.toISOString(),
+                })) as Prisma.InputJsonValue)
+              : Prisma.DbNull,
           },
           update: {
             op: task.id !== e.taskId ? "move" : "update",
-            changes: Object.fromEntries(changed.map((k) => [k, [null, (next as Record<string, unknown>)[k]]])) as Prisma.InputJsonValue,
-            segments: segs ? (segs.map((s) => ({ startedAt: s.startedAt.toISOString(), endedAt: s.endedAt.toISOString() })) as Prisma.InputJsonValue) : Prisma.DbNull,
+            changes: Object.fromEntries(
+              changed.map((k) => [k, [null, (next as Record<string, unknown>)[k]]]),
+            ) as Prisma.InputJsonValue,
+            segments: segs
+              ? (segs.map((s) => ({
+                  startedAt: s.startedAt.toISOString(),
+                  endedAt: s.endedAt.toISOString(),
+                })) as Prisma.InputJsonValue)
+              : Prisma.DbNull,
           },
         });
-        await this.events.emit(tx, { ws: ctx.workspace.id, topic: "invoice", action: "change_staged", entity: e.invoice.id });
-        await this.events.emit(tx, { ws: ctx.workspace.id, member: e.memberId, topic: "time", action: "staged", entity: id });
+        await this.events.emit(tx, {
+          ws: ctx.workspace.id,
+          topic: "invoice",
+          action: "change_staged",
+          entity: e.invoice.id,
+        });
+        await this.events.emit(tx, {
+          ws: ctx.workspace.id,
+          member: e.memberId,
+          topic: "time",
+          action: "staged",
+          entity: id,
+        });
         return { ok: true, staged: true, invoiceId: e.invoice.id, invoiceNumber: e.invoice.number };
       }
 
       if (segs) {
         await tx.timeEntrySegment.deleteMany({ where: { timeEntryId: id } });
-        await tx.timeEntrySegment.createMany({ data: segs.map((s) => ({ ...s, workspaceId: ctx.workspace.id, timeEntryId: id })) });
+        await tx.timeEntrySegment.createMany({
+          data: segs.map((s) => ({ ...s, workspaceId: ctx.workspace.id, timeEntryId: id })),
+        });
       } else if (input.durationSeconds) {
         // Switching to Duration drops the segments (06 §2.9)
         await tx.timeEntrySegment.deleteMany({ where: { timeEntryId: id } });
@@ -583,8 +739,20 @@ export class TimeController {
           version: { increment: 1 },
         },
       });
-      await this.events.emit(tx, { ws: ctx.workspace.id, member: e.memberId, topic: "time", action: "updated", entity: id });
-      if (e.invoiceId) await this.events.emit(tx, { ws: ctx.workspace.id, topic: "invoice", action: "lines_outdated", entity: e.invoiceId });
+      await this.events.emit(tx, {
+        ws: ctx.workspace.id,
+        member: e.memberId,
+        topic: "time",
+        action: "updated",
+        entity: id,
+      });
+      if (e.invoiceId)
+        await this.events.emit(tx, {
+          ws: ctx.workspace.id,
+          topic: "invoice",
+          action: "lines_outdated",
+          entity: e.invoiceId,
+        });
       return { ok: true, staged: false, onDraft: !!e.invoiceId };
     });
   }
@@ -602,14 +770,28 @@ export class TimeController {
     return this.prisma.$transaction(async (tx) => {
       const e = await this.loadEntry(tx, ctx, id);
       if (e.invoice?.status === "issued") {
-        throw conflict("billed", `This time is on invoice ${e.invoice.number}. Propose a change there.`);
+        throw conflict(
+          "billed",
+          `This time is on invoice ${e.invoice.number}. Propose a change there.`,
+        );
       }
       if (e.invoiceId) {
         // On a draft: release the claim; the draft's lines go out of date.
-        await tx.invoiceLineEntry.deleteMany({ where: { timeEntryId: id, line: { version: { frozenAt: null } } } });
+        await tx.invoiceLineEntry.deleteMany({
+          where: { timeEntryId: id, line: { version: { frozenAt: null } } },
+        });
       }
-      await tx.timeEntry.update({ where: { id }, data: { deletedAt: new Date(), invoiceId: null, version: { increment: 1 } } });
-      await this.events.emit(tx, { ws: ctx.workspace.id, member: e.memberId, topic: "time", action: "deleted", entity: id });
+      await tx.timeEntry.update({
+        where: { id },
+        data: { deletedAt: new Date(), invoiceId: null, version: { increment: 1 } },
+      });
+      await this.events.emit(tx, {
+        ws: ctx.workspace.id,
+        member: e.memberId,
+        topic: "time",
+        action: "deleted",
+        entity: id,
+      });
       return { ok: true };
     });
   }
@@ -619,8 +801,17 @@ export class TimeController {
   async restore(@C() ctx: Ctx, @Param("id") id: string) {
     return this.prisma.$transaction(async (tx) => {
       const e = await this.loadEntry(tx, ctx, id);
-      await tx.timeEntry.update({ where: { id }, data: { deletedAt: null, version: { increment: 1 } } });
-      await this.events.emit(tx, { ws: ctx.workspace.id, member: e.memberId, topic: "time", action: "restored", entity: id });
+      await tx.timeEntry.update({
+        where: { id },
+        data: { deletedAt: null, version: { increment: 1 } },
+      });
+      await this.events.emit(tx, {
+        ws: ctx.workspace.id,
+        member: e.memberId,
+        topic: "time",
+        action: "restored",
+        entity: id,
+      });
       return { ok: true };
     });
   }
@@ -643,7 +834,13 @@ export class TimeController {
           billable: e.billable,
         },
       });
-      await this.events.emit(tx, { ws: ctx.workspace.id, member: e.memberId, topic: "time", action: "created", entity: copy.id });
+      await this.events.emit(tx, {
+        ws: ctx.workspace.id,
+        member: e.memberId,
+        topic: "time",
+        action: "created",
+        entity: copy.id,
+      });
       return { id: copy.id };
     });
   }
@@ -657,7 +854,13 @@ export class TimeController {
     return this.prisma.$transaction(async (tx) => {
       const r = input.kind
         ? await tx.timeEntry.updateMany({
-            where: { id: { in: input.entryIds }, workspaceId: ctx.workspace.id, invoiceId: null, state: "stopped", deletedAt: null },
+            where: {
+              id: { in: input.entryIds },
+              workspaceId: ctx.workspace.id,
+              invoiceId: null,
+              state: "stopped",
+              deletedAt: null,
+            },
             data: {
               offInvoice: input.kind,
               offInvoiceRef: input.kind === "billed_elsewhere" ? (input.ref ?? "") : null,
@@ -666,17 +869,38 @@ export class TimeController {
             },
           })
         : await tx.timeEntry.updateMany({
-            where: { id: { in: input.entryIds }, workspaceId: ctx.workspace.id, offInvoice: { not: null } },
-            data: { offInvoice: null, offInvoiceRef: null, offInvoiceNote: null, version: { increment: 1 } },
+            where: {
+              id: { in: input.entryIds },
+              workspaceId: ctx.workspace.id,
+              offInvoice: { not: null },
+            },
+            data: {
+              offInvoice: null,
+              offInvoiceRef: null,
+              offInvoiceNote: null,
+              version: { increment: 1 },
+            },
           });
-      await this.events.emit(tx, { ws: ctx.workspace.id, member: ctx.member.id, topic: "time", action: "off_invoice" });
+      await this.events.emit(tx, {
+        ws: ctx.workspace.id,
+        member: ctx.member.id,
+        topic: "time",
+        action: "off_invoice",
+      });
       return { count: r.count };
     });
   }
 
   @Post("time-entries/bulk")
   @HttpCode(200)
-  async bulk(@C() ctx: Ctx, @Body() body: { entryIds: string[]; action: "delete" | "billable" | "non_billable" | "move"; taskId?: string }) {
+  async bulk(
+    @C() ctx: Ctx,
+    @Body() body: {
+      entryIds: string[];
+      action: "delete" | "billable" | "non_billable" | "move";
+      taskId?: string;
+    },
+  ) {
     const ids = Array.isArray(body.entryIds) ? body.entryIds.slice(0, 1000) : [];
     return this.prisma.$transaction(async (tx) => {
       const where: Prisma.TimeEntryWhereInput = {
@@ -689,15 +913,34 @@ export class TimeController {
       };
       let count = 0;
       if (body.action === "delete") {
-        count = (await tx.timeEntry.updateMany({ where, data: { deletedAt: new Date(), invoiceId: null } })).count;
+        count = (
+          await tx.timeEntry.updateMany({ where, data: { deletedAt: new Date(), invoiceId: null } })
+        ).count;
       } else if (body.action === "billable" || body.action === "non_billable") {
-        count = (await tx.timeEntry.updateMany({ where, data: { billable: body.action === "billable", version: { increment: 1 } } })).count;
+        count = (
+          await tx.timeEntry.updateMany({
+            where,
+            data: { billable: body.action === "billable", version: { increment: 1 } },
+          })
+        ).count;
       } else if (body.action === "move" && body.taskId) {
-        const task = await tx.task.findFirst({ where: { id: body.taskId, workspaceId: ctx.workspace.id } });
+        const task = await tx.task.findFirst({
+          where: { id: body.taskId, workspaceId: ctx.workspace.id },
+        });
         if (!task) throw notFound("Task not found");
-        count = (await tx.timeEntry.updateMany({ where, data: { taskId: task.id, version: { increment: 1 } } })).count;
+        count = (
+          await tx.timeEntry.updateMany({
+            where,
+            data: { taskId: task.id, version: { increment: 1 } },
+          })
+        ).count;
       }
-      await this.events.emit(tx, { ws: ctx.workspace.id, member: ctx.member.id, topic: "time", action: "bulk" });
+      await this.events.emit(tx, {
+        ws: ctx.workspace.id,
+        member: ctx.member.id,
+        topic: "time",
+        action: "bulk",
+      });
       return { count, skipped: ids.length - count };
     });
   }

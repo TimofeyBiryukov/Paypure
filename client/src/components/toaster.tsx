@@ -1,7 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { createContext, useActionState, useCallback, useContext, useEffect, useRef, useState } from "react";
+import {
+  createContext,
+  useActionState,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import * as undoActions from "@/app/actions/undo";
 import type { ActionState, Toast } from "@/lib/action";
 import { Submit } from "./submit";
@@ -21,16 +29,28 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   return (
     <ToastCtx.Provider value={push}>
       {children}
-      <div className="fixed bottom-20 sm:bottom-6 left-1/2 -translate-x-1/2 z-50 flex flex-col gap-2 items-center" aria-live="polite">
+      <div
+        className="fixed bottom-20 sm:bottom-6 left-1/2 -translate-x-1/2 z-50 flex flex-col gap-2 items-center"
+        aria-live="polite"
+      >
         {items.map((t) => (
-          <div key={t.id} className="pop flex items-center gap-3 px-4 py-2.5 text-sm" style={t.tone === "danger" ? { color: "var(--danger-fg)" } : undefined}>
+          <div
+            key={t.id}
+            className="pop flex items-center gap-3 px-4 py-2.5 text-sm"
+            style={t.tone === "danger" ? { color: "var(--danger-fg)" } : undefined}
+          >
             <span>{t.text}</span>
             {t.link && (
               <Link href={t.link.href} className="font-medium text-accent">
                 {t.link.label}
               </Link>
             )}
-            {t.undo && <UndoForm undo={t.undo} onDone={() => setItems((xs) => xs.filter((x) => x.id !== t.id))} />}
+            {t.undo && (
+              <UndoForm
+                undo={t.undo}
+                onDone={() => setItems((xs) => xs.filter((x) => x.id !== t.id))}
+              />
+            )}
           </div>
         ))}
       </div>
@@ -107,7 +127,14 @@ export function ActionForm({
   }, [state, push, reset, closeDialog, onSuccess]);
   return (
     <FormStateCtx.Provider value={state}>
-      <form ref={ref} action={formAction} className={className} id={id} role={role} autoComplete={autoComplete}>
+      <form
+        ref={ref}
+        action={formAction}
+        className={className}
+        id={id}
+        role={role}
+        autoComplete={autoComplete}
+      >
         {showError && state && !state.ok && state.error && (
           <div className="banner banner-danger mb-3 text-sm" role="alert">
             {state.error}

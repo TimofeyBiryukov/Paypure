@@ -64,7 +64,15 @@ export async function apiRaw(path: string): Promise<Response> {
 }
 
 export interface Me {
-  member: { id: string; name: string; email: string; role: "admin" | "member"; timeZone: string; timeFormat: "12h" | "24h"; weekStart: number };
+  member: {
+    id: string;
+    name: string;
+    email: string;
+    role: "admin" | "member";
+    timeZone: string;
+    timeFormat: "12h" | "24h";
+    weekStart: number;
+  };
   isAdmin: boolean;
   tz: string;
   workspace: { id: string; name: string; currency: string; timeZone: string; businessName: string };

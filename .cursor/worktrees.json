@@ -1,0 +1,4 @@
+{
+  "setup-worktree-unix": ["bash scripts/agent/setup.sh"],
+  "setup-worktree": ["bash scripts/agent/setup.sh"]
+}

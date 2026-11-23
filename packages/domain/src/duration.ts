@@ -46,7 +46,8 @@ export function parseDuration(input: string): number | null {
     return Math.round(Number(m[1]) * 3600) + (m[2] ? Number(m[2]) * 60 : 0);
   }
   if ((m = s.match(/^(\d+)m(?:in)?$/))) return Number(m[1]) * 60;
-  if ((m = s.match(/^(\d+(?:[.,]\d+)?)$/))) return Math.round(Number(m[1].replace(",", ".")) * 3600);
+  if ((m = s.match(/^(\d+(?:[.,]\d+)?)$/)))
+    return Math.round(Number(m[1].replace(",", ".")) * 3600);
   return null;
 }
 

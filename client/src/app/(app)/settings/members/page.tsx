@@ -41,8 +41,14 @@ export default async function MembersPage() {
                 <td className="text-muted">{m.email}</td>
                 <td>{m.role === "admin" ? "Admin" : "Member"}</td>
                 <td>
-                  <span className={`chip ${m.status === "active" ? "chip-success" : m.status === "invited" ? "chip-info" : "chip-neutral"}`}>
-                    {m.status === "active" ? "Active" : m.status === "invited" ? "Invited" : "Deactivated"}
+                  <span
+                    className={`chip ${m.status === "active" ? "chip-success" : m.status === "invited" ? "chip-info" : "chip-neutral"}`}
+                  >
+                    {m.status === "active"
+                      ? "Active"
+                      : m.status === "invited"
+                        ? "Invited"
+                        : "Deactivated"}
                   </span>
                 </td>
                 <td className="text-right">
@@ -74,7 +80,14 @@ export default async function MembersPage() {
               <label className="label" htmlFor="inv-email">
                 Email
               </label>
-              <input id="inv-email" name="email" type="email" className="input" required autoComplete="off" />
+              <input
+                id="inv-email"
+                name="email"
+                type="email"
+                className="input"
+                required
+                autoComplete="off"
+              />
               <FieldError name="email" />
             </div>
             <div>
@@ -88,7 +101,9 @@ export default async function MembersPage() {
             </div>
             <Submit pendingText="Inviting…">Invite member</Submit>
           </div>
-          <p className="hint">Members track their own time and see clients and projects, without money.</p>
+          <p className="hint">
+            Members track their own time and see clients and projects, without money.
+          </p>
           <InviteResult />
         </ActionForm>
       </section>

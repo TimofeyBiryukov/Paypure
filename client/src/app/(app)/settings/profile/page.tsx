@@ -38,7 +38,12 @@ export default async function ProfilePage() {
           <div className="seg">
             {(["24h", "12h"] as const).map((f) => (
               <label key={f}>
-                <input type="radio" name="timeFormat" value={f} defaultChecked={m.timeFormat === f} />
+                <input
+                  type="radio"
+                  name="timeFormat"
+                  value={f}
+                  defaultChecked={m.timeFormat === f}
+                />
                 {f === "24h" ? "24-hour (14:30)" : "12-hour (2:30 PM)"}
               </label>
             ))}
@@ -48,7 +53,12 @@ export default async function ProfilePage() {
           <label className="label" htmlFor="f-weekStart">
             Week starts on
           </label>
-          <select id="f-weekStart" name="weekStart" className="select max-w-[220px]" defaultValue={String(m.weekStart)}>
+          <select
+            id="f-weekStart"
+            name="weekStart"
+            className="select max-w-[220px]"
+            defaultValue={String(m.weekStart)}
+          >
             {DAYS.map((d, i) => (
               <option key={d} value={i}>
                 {d}
@@ -59,8 +69,20 @@ export default async function ProfilePage() {
         <fieldset className="border-t border-line pt-4 space-y-4">
           <legend className="t-title-3 pt-4">Change password</legend>
           <p className="hint -mt-2">Leave empty to keep your current password.</p>
-          <Field name="password" label="New password" type="password" autoComplete="new-password" minLength={8} />
-          <Field name="password2" label="Repeat new password" type="password" autoComplete="new-password" minLength={8} />
+          <Field
+            name="password"
+            label="New password"
+            type="password"
+            autoComplete="new-password"
+            minLength={8}
+          />
+          <Field
+            name="password2"
+            label="Repeat new password"
+            type="password"
+            autoComplete="new-password"
+            minLength={8}
+          />
         </fieldset>
         <Submit pendingText="Saving…">Save profile</Submit>
       </ActionForm>

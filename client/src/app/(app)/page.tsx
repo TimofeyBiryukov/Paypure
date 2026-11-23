@@ -1,4 +1,14 @@
-import { addDays, formatDateLong, formatDateRelative, formatDateShort, formatDuration, formatHoursMinutes, formatMoney, todayIn, toLocalTime } from "@paypure/domain";
+import {
+  addDays,
+  formatDateLong,
+  formatDateRelative,
+  formatDateShort,
+  formatDuration,
+  formatHoursMinutes,
+  formatMoney,
+  todayIn,
+  toLocalTime,
+} from "@paypure/domain";
 import Link from "next/link";
 import { EntryLine } from "@/components/entry-line";
 import { ClientBadge, Empty, MoneyList, Stat, StatusChip } from "@/components/ui";
@@ -9,18 +19,41 @@ export const metadata = { title: "Home" };
 
 interface HomeData {
   today: string;
-  days: { date: string; seconds: number; clients: { name: string; colour: number; seconds: number }[] }[];
+  days: {
+    date: string;
+    seconds: number;
+    clients: { name: string; colour: number; seconds: number }[];
+  }[];
   thisWeekSeconds: number;
   lastWeekSeconds: number;
   firstRun: boolean;
   memberHasTasks: boolean;
   checklist: { business: boolean; client: boolean; time: boolean };
-  ready?: { clientId: string; name: string; colour: number; currency: string; seconds: number; amountMinor: number; noRateSeconds: number; since: string | null; ready: boolean; stale: boolean }[];
+  ready?: {
+    clientId: string;
+    name: string;
+    colour: number;
+    currency: string;
+    seconds: number;
+    amountMinor: number;
+    noRateSeconds: number;
+    since: string | null;
+    ready: boolean;
+    stale: boolean;
+  }[];
   outstanding?: {
     outstanding: { currency: string; minor: number }[];
     overdue: { currency: string; minor: number }[];
     paidThisMonth: { currency: string; minor: number }[];
-    top: { id: string; number: string | null; client: { name: string; colour: number }; balanceMinor: number; currency: string; dueDate: string | null; display: { label: string; tone: "danger" } }[];
+    top: {
+      id: string;
+      number: string | null;
+      client: { name: string; colour: number };
+      balanceMinor: number;
+      currency: string;
+      dueDate: string | null;
+      display: { label: string; tone: "danger" };
+    }[];
   };
 }
 
@@ -47,12 +80,20 @@ export default async function HomePage() {
         <p className="text-muted mb-6">Three steps and you're tracking.</p>
         <ol className="card divide-y divide-[var(--border)]">
           {[
-            { done: home.checklist.business, label: "Add your business details", href: "/settings/business" },
+            {
+              done: home.checklist.business,
+              label: "Add your business details",
+              href: "/settings/business",
+            },
             { done: home.checklist.client, label: "Add a client", href: "/clients/new" },
             { done: home.checklist.time, label: "Track your first hour", href: "/time" },
           ].map((s, i) => (
             <li key={s.label} className="flex items-center gap-3 p-4">
-              <span className={`w-6 h-6 rounded-full flex items-center justify-center t-micro ${s.done ? "chip-success" : "bg-sunken"}`}>{s.done ? "✓" : i + 1}</span>
+              <span
+                className={`w-6 h-6 rounded-full flex items-center justify-center t-micro ${s.done ? "chip-success" : "bg-sunken"}`}
+              >
+                {s.done ? "✓" : i + 1}
+              </span>
               <Link href={s.href} className="font-medium hover:text-accent">
                 {s.label}
               </Link>
@@ -98,9 +139,13 @@ export default async function HomePage() {
               ))}
               {gaps.map((g) => (
                 <li key={g.from} className="py-2">
-                  <Link href={`/time?view=day&date=${today}&new=1&start=${encodeURIComponent(g.from)}&end=${encodeURIComponent(g.to)}`} className="gap-row flex items-center justify-between px-3 py-2 hover:bg-sunken">
+                  <Link
+                    href={`/time?view=day&date=${today}&new=1&start=${encodeURIComponent(g.from)}&end=${encodeURIComponent(g.to)}`}
+                    className="gap-row flex items-center justify-between px-3 py-2 hover:bg-sunken"
+                  >
                     <span className="tnum">
-                      {toLocalTime(g.from, tz)}–{toLocalTime(g.to, tz)} · {formatDuration(g.seconds)} not tracked
+                      {toLocalTime(g.from, tz)}–{toLocalTime(g.to, tz)} ·{" "}
+                      {formatDuration(g.seconds)} not tracked
                     </span>
                     <span className="text-accent font-medium">+ Fill</span>
                   </Link>
@@ -115,18 +160,39 @@ export default async function HomePage() {
             <h2 className="t-title-2">This week</h2>
             <span className="tnum">
               <span className="font-semibold">{formatHoursMinutes(home.thisWeekSeconds)}</span>
-              <span className="text-muted"> · {diff >= 0 ? "+" : "−"}{formatHoursMinutes(Math.abs(diff))}</span>
+              <span className="text-muted">
+                {" "}
+                · {diff >= 0 ? "+" : "−"}
+                {formatHoursMinutes(Math.abs(diff))}
+              </span>
             </span>
           </div>
-          <div className="flex items-end gap-2 h-36" role="img" aria-label={`Hours this week: ${home.days.map((d) => `${formatDateShort(d.date)} ${formatHoursMinutes(d.seconds)}`).join(", ")}`}>
+          <div
+            className="flex items-end gap-2 h-36"
+            role="img"
+            aria-label={`Hours this week: ${home.days.map((d) => `${formatDateShort(d.date)} ${formatHoursMinutes(d.seconds)}`).join(", ")}`}
+          >
             {home.days.map((d) => (
-              <Link key={d.date} href={`/time?view=day&date=${d.date}`} className="flex-1 flex flex-col items-center gap-1 group" title={`${formatDateShort(d.date)} · ${formatHoursMinutes(d.seconds)}`}>
-                <div className="w-full flex flex-col-reverse rounded-sm overflow-hidden" style={{ height: `${(d.seconds / max) * 112}px`, minHeight: d.seconds ? 2 : 0 }}>
+              <Link
+                key={d.date}
+                href={`/time?view=day&date=${d.date}`}
+                className="flex-1 flex flex-col items-center gap-1 group"
+                title={`${formatDateShort(d.date)} · ${formatHoursMinutes(d.seconds)}`}
+              >
+                <div
+                  className="w-full flex flex-col-reverse rounded-sm overflow-hidden"
+                  style={{ height: `${(d.seconds / max) * 112}px`, minHeight: d.seconds ? 2 : 0 }}
+                >
                   {d.clients.map((c) => (
-                    <span key={c.name} style={{ flex: c.seconds, background: `var(--c${c.colour % 10})` }} />
+                    <span
+                      key={c.name}
+                      style={{ flex: c.seconds, background: `var(--c${c.colour % 10})` }}
+                    />
                   ))}
                 </div>
-                <span className={`t-caption ${d.date === today ? "text-ink font-semibold" : ""}`}>{formatDateShort(d.date).slice(0, 3)}</span>
+                <span className={`t-caption ${d.date === today ? "text-ink font-semibold" : ""}`}>
+                  {formatDateShort(d.date).slice(0, 3)}
+                </span>
               </Link>
             ))}
           </div>
@@ -147,34 +213,48 @@ export default async function HomePage() {
                   {home.ready.map((r) => (
                     <tr key={r.clientId}>
                       <td>
-                        <Link href={`/clients/${r.clientId}`} className="flex items-center gap-2 font-semibold">
+                        <Link
+                          href={`/clients/${r.clientId}`}
+                          className="flex items-center gap-2 font-semibold"
+                        >
                           <ClientBadge name={r.name} colour={r.colour} /> {r.name}
                         </Link>
                       </td>
                       <td className="num text-muted">{formatHoursMinutes(r.seconds)}</td>
                       <td className="num font-semibold">
                         {r.noRateSeconds > 0 && r.amountMinor === 0 ? (
-                          <Link href={`/clients/${r.clientId}?tab=details`} className="text-warning">
+                          <Link
+                            href={`/clients/${r.clientId}?tab=details`}
+                            className="text-warning"
+                          >
                             Set a rate
                           </Link>
                         ) : (
                           formatMoney({ minor: r.amountMinor, currency: r.currency })
                         )}
                       </td>
-                      <td className="text-muted whitespace-nowrap">{r.since ? `since ${formatDateRelative(r.since, today)}` : ""}</td>
+                      <td className="text-muted whitespace-nowrap">
+                        {r.since ? `since ${formatDateRelative(r.since, today)}` : ""}
+                      </td>
                       <td className="whitespace-nowrap">
                         {r.ready && <span className="chip chip-info plain mr-2">Ready</span>}
                         {r.stale && (
                           <>
                             <span className="chip chip-warning plain mr-2">Stale</span>
-                            <Link href={`/time?client=${r.clientId}&state=unbilled&from=2000-01-01&to=${addDays(today, -60)}&view=list`} className="text-accent font-medium">
+                            <Link
+                              href={`/time?client=${r.clientId}&state=unbilled&from=2000-01-01&to=${addDays(today, -60)}&view=list`}
+                              className="text-accent font-medium"
+                            >
                               Review
                             </Link>
                           </>
                         )}
                       </td>
                       <td className="text-right">
-                        <Link href={`/invoices/new?client=${r.clientId}`} className="btn btn-secondary btn-sm">
+                        <Link
+                          href={`/invoices/new?client=${r.clientId}`}
+                          className="btn btn-secondary btn-sm"
+                        >
                           Create invoice
                         </Link>
                       </td>
@@ -214,10 +294,13 @@ export default async function HomePage() {
                       </td>
                       <td>
                         <span className="flex items-center gap-2">
-                          <ClientBadge name={i.client.name} colour={i.client.colour} size={20} /> {i.client.name}
+                          <ClientBadge name={i.client.name} colour={i.client.colour} size={20} />{" "}
+                          {i.client.name}
                         </span>
                       </td>
-                      <td className="num">{formatMoney({ minor: i.balanceMinor, currency: i.currency })}</td>
+                      <td className="num">
+                        {formatMoney({ minor: i.balanceMinor, currency: i.currency })}
+                      </td>
                       <td className="text-right">
                         <StatusChip label={i.display.label} tone={i.display.tone} />
                       </td>

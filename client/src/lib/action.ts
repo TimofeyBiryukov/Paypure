@@ -27,7 +27,14 @@ export async function run(fn: () => Promise<ActionState | undefined | void>): Pr
   } catch (e) {
     unstable_rethrow(e);
     if (e instanceof ApiError) {
-      return { ok: false, error: e.message, code: e.code, fields: e.fields, data: e.extra, at: Date.now() };
+      return {
+        ok: false,
+        error: e.message,
+        code: e.code,
+        fields: e.fields,
+        data: e.extra,
+        at: Date.now(),
+      };
     }
     console.error(e);
     return { ok: false, error: "Something went wrong. Try again.", at: Date.now() };
@@ -39,4 +46,5 @@ export const str = (fd: FormData, k: string) => {
   return typeof v === "string" ? v.trim() : "";
 };
 export const optStr = (fd: FormData, k: string) => (fd.has(k) ? str(fd, k) : undefined);
-export const bool = (fd: FormData, k: string) => fd.get(k) === "on" || fd.get(k) === "true" || fd.get(k) === "1";
+export const bool = (fd: FormData, k: string) =>
+  fd.get(k) === "on" || fd.get(k) === "true" || fd.get(k) === "1";

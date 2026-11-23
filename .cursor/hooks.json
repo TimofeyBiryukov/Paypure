@@ -1,0 +1,6 @@
+{
+  "version": 1,
+  "hooks": {
+    "beforeShellExecution": [{ "command": "node scripts/agent/guard.mjs", "timeout": 10 }]
+  }
+}

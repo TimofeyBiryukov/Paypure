@@ -1,5 +1,5 @@
 import { Body, Controller, Delete, Get, HttpCode, Param, Patch, Post, Query } from "@nestjs/common";
-import { ClientInput, ProjectInput, TaskInput, sumByCurrency, todayIn } from "@paypure/domain";
+import { ClientInput, ProjectInput, sumByCurrency, TaskInput, todayIn } from "@paypure/domain";
 import { AdminOnly, C, type Ctx } from "../common/auth";
 import { d2s } from "../common/dates";
 import { conflict, invalid, notFound } from "../common/errors";
@@ -39,9 +39,19 @@ export class CatalogController {
         id: true,
         name: true,
         billingMode: true,
-        project: { select: { id: true, name: true, client: { select: { id: true, name: true, colour: true } } } },
+        project: {
+          select: {
+            id: true,
+            name: true,
+            client: { select: { id: true, name: true, colour: true } },
+          },
+        },
       },
-      orderBy: [{ project: { client: { name: "asc" } } }, { project: { name: "asc" } }, { position: "asc" }],
+      orderBy: [
+        { project: { client: { name: "asc" } } },
+        { project: { name: "asc" } },
+        { position: "asc" },
+      ],
     });
     const recent = await this.prisma.timeEntry.findMany({
       where: { memberId: ctx.member.id, deletedAt: null, taskId: { not: null } },
@@ -110,14 +120,20 @@ export class CatalogController {
         ...r,
         unbilledMinor: unbilled.get(r.id)?.amountMinor ?? 0,
         outstandingMinor: inv.reduce((s, i) => s + i.balanceMinor, 0),
-        overdueMinor: inv.filter((i) => i.display.key === "overdue").reduce((s, i) => s + i.balanceMinor, 0),
+        overdueMinor: inv
+          .filter((i) => i.display.key === "overdue")
+          .reduce((s, i) => s + i.balanceMinor, 0),
       };
     });
     return {
       clients: money,
       totals: {
-        unbilled: sumByCurrency(money.map((m) => ({ minor: m.unbilledMinor, currency: m.currency }))),
-        outstanding: sumByCurrency(money.map((m) => ({ minor: m.outstandingMinor, currency: m.currency }))),
+        unbilled: sumByCurrency(
+          money.map((m) => ({ minor: m.unbilledMinor, currency: m.currency })),
+        ),
+        outstanding: sumByCurrency(
+          money.map((m) => ({ minor: m.outstandingMinor, currency: m.currency })),
+        ),
         overdue: sumByCurrency(money.map((m) => ({ minor: m.overdueMinor, currency: m.currency }))),
       },
     };
@@ -150,7 +166,12 @@ export class CatalogController {
           notes: input.notes ?? "",
         },
       });
-      await this.events.emit(tx, { ws: ctx.workspace.id, topic: "catalog", action: "client.created", entity: client.id });
+      await this.events.emit(tx, {
+        ws: ctx.workspace.id,
+        topic: "catalog",
+        action: "client.created",
+        entity: client.id,
+      });
       return { id: client.id };
     });
   }
@@ -166,7 +187,9 @@ export class CatalogController {
       },
     });
     if (!client) throw notFound("Client not found");
-    const invoiceCount = await this.prisma.invoice.count({ where: { clientId: id, status: { not: "draft" } } });
+    const invoiceCount = await this.prisma.invoice.count({
+      where: { clientId: id, status: { not: "draft" } },
+    });
     const projectSeconds = await this.prisma.$queryRaw<{ project_id: string; seconds: number }[]>`
       SELECT t.project_id, SUM(te.duration_seconds)::int AS seconds
       FROM time_entries te JOIN tasks t ON t.id = te.task_id JOIN projects p ON p.id = t.project_id
@@ -177,7 +200,10 @@ export class CatalogController {
       ...stripMoney(ctx, client),
       currencyLocked: invoiceCount > 0,
       canDelete: invoiceCount === 0,
-      projects: client.projects.map((p) => ({ ...stripMoney(ctx, p), trackedSeconds: secMap.get(p.id) ?? 0 })),
+      projects: client.projects.map((p) => ({
+        ...stripMoney(ctx, p),
+        trackedSeconds: secMap.get(p.id) ?? 0,
+      })),
     };
     if (!ctx.isAdmin) return base;
 
@@ -188,7 +214,10 @@ export class CatalogController {
     const year = todayIn(ws.timeZone).slice(0, 4);
     const perProject = new Map<string, number>();
     for (const t of tasks) {
-      perProject.set(t.projectId, (perProject.get(t.projectId) ?? 0) + (t.hourlyMinor ?? 0) + t.fixedRemainingMinor);
+      perProject.set(
+        t.projectId,
+        (perProject.get(t.projectId) ?? 0) + (t.hourlyMinor ?? 0) + t.fixedRemainingMinor,
+      );
     }
     return {
       ...base,
@@ -197,8 +226,12 @@ export class CatalogController {
         unbilledMinor: rollup?.amountMinor ?? 0,
         unbilledSeconds: rollup?.seconds ?? 0,
         noRateSeconds: rollup?.noRateSeconds ?? 0,
-        outstandingMinor: issued.filter((i) => i.balanceMinor > 0).reduce((s, i) => s + i.balanceMinor, 0),
-        overdueMinor: issued.filter((i) => i.display.key === "overdue").reduce((s, i) => s + i.balanceMinor, 0),
+        outstandingMinor: issued
+          .filter((i) => i.balanceMinor > 0)
+          .reduce((s, i) => s + i.balanceMinor, 0),
+        overdueMinor: issued
+          .filter((i) => i.display.key === "overdue")
+          .reduce((s, i) => s + i.balanceMinor, 0),
         invoicedThisYearMinor: issued
           .filter((i) => i.issueDate?.startsWith(year))
           .reduce((s, i) => s + i.totalMinor, 0),
@@ -212,16 +245,26 @@ export class CatalogController {
   @Patch("clients/:id")
   async updateClient(@C() ctx: Ctx, @Param("id") id: string, @Body() body: unknown) {
     const input = parse(ClientInput.partial(), body);
-    const client = await this.prisma.client.findFirst({ where: { id, workspaceId: ctx.workspace.id } });
+    const client = await this.prisma.client.findFirst({
+      where: { id, workspaceId: ctx.workspace.id },
+    });
     if (!client) throw notFound("Client not found");
     if (input.currency && input.currency !== client.currency) {
       // One currency per client, locked at the first invoice (Brief §7.1).
       const n = await this.prisma.invoice.count({ where: { clientId: id } });
-      if (n > 0) throw conflict("currency_locked", "The currency is locked because this client has invoices.");
+      if (n > 0)
+        throw conflict(
+          "currency_locked",
+          "The currency is locked because this client has invoices.",
+        );
     }
     if (input.defaultPaymentAccountId) {
       const acc = await this.prisma.paymentAccount.findFirst({
-        where: { id: input.defaultPaymentAccountId, workspaceId: ctx.workspace.id, archivedAt: null },
+        where: {
+          id: input.defaultPaymentAccountId,
+          workspaceId: ctx.workspace.id,
+          archivedAt: null,
+        },
       });
       if (!acc || acc.currency !== (input.currency ?? client.currency)) {
         throw invalid("The default account must be in the client's currency.");
@@ -233,10 +276,17 @@ export class CatalogController {
         data: {
           ...input,
           // A currency change clears the default account (07 §8.1).
-          ...(input.currency && input.currency !== client.currency ? { defaultPaymentAccountId: null } : {}),
+          ...(input.currency && input.currency !== client.currency
+            ? { defaultPaymentAccountId: null }
+            : {}),
         },
       });
-      await this.events.emit(tx, { ws: ctx.workspace.id, topic: "catalog", action: "client.updated", entity: id });
+      await this.events.emit(tx, {
+        ws: ctx.workspace.id,
+        topic: "catalog",
+        action: "client.updated",
+        entity: id,
+      });
     });
     return { ok: true };
   }
@@ -257,9 +307,17 @@ export class CatalogController {
 
   private async setArchived(ctx: Ctx, id: string, at: Date | null) {
     await this.prisma.$transaction(async (tx) => {
-      const r = await tx.client.updateMany({ where: { id, workspaceId: ctx.workspace.id }, data: { archivedAt: at } });
+      const r = await tx.client.updateMany({
+        where: { id, workspaceId: ctx.workspace.id },
+        data: { archivedAt: at },
+      });
       if (!r.count) throw notFound("Client not found");
-      await this.events.emit(tx, { ws: ctx.workspace.id, topic: "catalog", action: "client.archived", entity: id });
+      await this.events.emit(tx, {
+        ws: ctx.workspace.id,
+        topic: "catalog",
+        action: "client.archived",
+        entity: id,
+      });
     });
     return { ok: true };
   }
@@ -268,19 +326,36 @@ export class CatalogController {
   @AdminOnly()
   @Delete("clients/:id")
   async deleteClient(@C() ctx: Ctx, @Param("id") id: string) {
-    const n = await this.prisma.invoice.count({ where: { clientId: id, status: { not: "draft" } } });
-    if (n > 0) throw conflict("has_invoices", "Clients with sent invoices are kept for your records. Archive it instead.");
+    const n = await this.prisma.invoice.count({
+      where: { clientId: id, status: { not: "draft" } },
+    });
+    if (n > 0)
+      throw conflict(
+        "has_invoices",
+        "Clients with sent invoices are kept for your records. Archive it instead.",
+      );
     await this.prisma.$transaction(async (tx) => {
       const drafts = await tx.invoice.findMany({ where: { clientId: id }, select: { id: true } });
-      await tx.timeEntry.updateMany({ where: { invoiceId: { in: drafts.map((d) => d.id) } }, data: { invoiceId: null } });
+      await tx.timeEntry.updateMany({
+        where: { invoiceId: { in: drafts.map((d) => d.id) } },
+        data: { invoiceId: null },
+      });
       await tx.invoice.deleteMany({ where: { clientId: id } });
-      const tasks = await tx.task.findMany({ where: { project: { clientId: id } }, select: { id: true } });
+      const tasks = await tx.task.findMany({
+        where: { project: { clientId: id } },
+        select: { id: true },
+      });
       const taskIds = tasks.map((t) => t.id);
       await tx.timeEntry.deleteMany({ where: { taskId: { in: taskIds } } });
       await tx.task.deleteMany({ where: { id: { in: taskIds } } });
       await tx.project.deleteMany({ where: { clientId: id } });
       await tx.client.deleteMany({ where: { id, workspaceId: ctx.workspace.id } });
-      await this.events.emit(tx, { ws: ctx.workspace.id, topic: "catalog", action: "client.deleted", entity: id });
+      await this.events.emit(tx, {
+        ws: ctx.workspace.id,
+        topic: "catalog",
+        action: "client.deleted",
+        entity: id,
+      });
     });
     return { ok: true };
   }
@@ -292,7 +367,9 @@ export class CatalogController {
   async createProject(@C() ctx: Ctx, @Body() body: unknown) {
     const input = parse(ProjectInput, body);
     if (!input.clientId) throw invalid("Choose a client.");
-    const client = await this.prisma.client.findFirst({ where: { id: input.clientId, workspaceId: ctx.workspace.id } });
+    const client = await this.prisma.client.findFirst({
+      where: { id: input.clientId, workspaceId: ctx.workspace.id },
+    });
     if (!client) throw notFound("Client not found");
     return this.prisma.$transaction(async (tx) => {
       const p = await tx.project.create({
@@ -306,7 +383,12 @@ export class CatalogController {
           notes: input.notes ?? "",
         },
       });
-      await this.events.emit(tx, { ws: ctx.workspace.id, topic: "catalog", action: "project.created", entity: p.id });
+      await this.events.emit(tx, {
+        ws: ctx.workspace.id,
+        topic: "catalog",
+        action: "project.created",
+        entity: p.id,
+      });
       return { id: p.id };
     });
   }
@@ -344,7 +426,12 @@ export class CatalogController {
       status: project.status,
       notes: project.notes,
       budgetKind: project.budgetKind,
-      client: { id: project.client.id, name: project.client.name, colour: project.client.colour, currency: project.client.currency },
+      client: {
+        id: project.client.id,
+        name: project.client.name,
+        colour: project.client.colour,
+        currency: project.client.currency,
+      },
       trackedSeconds: totalTracked,
       ...(ctx.isAdmin ? { rateMinor: project.rateMinor, budgetValue: project.budgetValue } : {}),
       budgetValueHours: project.budgetKind === "hours" ? project.budgetValue : null,
@@ -369,14 +456,29 @@ export class CatalogController {
       moneyUsed = (billed[0]?.amount ?? 0) + hourlyUnbilled + fixedUnbilled;
     }
     const projectResolved = {
-      rateMinor: project.rateMinor ?? project.client.rateMinor ?? (project.client.currency === ws.currency ? ws.defaultRateMinor : null),
-      source: project.rateMinor != null ? "project" : project.client.rateMinor != null ? "client" : project.client.currency === ws.currency && ws.defaultRateMinor != null ? "workspace" : null,
+      rateMinor:
+        project.rateMinor ??
+        project.client.rateMinor ??
+        (project.client.currency === ws.currency ? ws.defaultRateMinor : null),
+      source:
+        project.rateMinor != null
+          ? "project"
+          : project.client.rateMinor != null
+            ? "client"
+            : project.client.currency === ws.currency && ws.defaultRateMinor != null
+              ? "workspace"
+              : null,
     };
     return {
       ...base,
       inheritedRate: projectResolved,
       clientRateMinor: project.client.rateMinor,
-      budgetUsed: project.budgetKind === "money" ? moneyUsed : project.budgetKind === "hours" ? totalTracked : null,
+      budgetUsed:
+        project.budgetKind === "money"
+          ? moneyUsed
+          : project.budgetKind === "hours"
+            ? totalTracked
+            : null,
       unbilledMinor: unbilled.reduce((s, u) => s + (u.hourlyMinor ?? 0) + u.fixedRemainingMinor, 0),
       tasks: tasksBase.map((t) => {
         const u = ub.get(t.id);
@@ -400,7 +502,12 @@ export class CatalogController {
     await this.prisma.$transaction(async (tx) => {
       const r = await tx.project.updateMany({ where: { id, workspaceId: ctx.workspace.id }, data });
       if (!r.count) throw notFound("Project not found");
-      await this.events.emit(tx, { ws: ctx.workspace.id, topic: "catalog", action: "project.updated", entity: id });
+      await this.events.emit(tx, {
+        ws: ctx.workspace.id,
+        topic: "catalog",
+        action: "project.updated",
+        entity: id,
+      });
     });
     return { ok: true };
   }
@@ -412,12 +519,20 @@ export class CatalogController {
   async createTask(@C() ctx: Ctx, @Body() body: unknown) {
     const input = parse(TaskInput, body);
     if (!input.projectId) throw invalid("Choose a project.");
-    const project = await this.prisma.project.findFirst({ where: { id: input.projectId, workspaceId: ctx.workspace.id } });
+    const project = await this.prisma.project.findFirst({
+      where: { id: input.projectId, workspaceId: ctx.workspace.id },
+    });
     if (!project) throw notFound("Project not found");
     const mode = ctx.isAdmin ? (input.billingMode ?? "hourly") : "hourly";
-    if (mode === "fixed" && !input.fixedAmountMinor) throw invalid("A fixed-fee task needs an amount.", { fields: { fixedAmountMinor: "Enter the fee" } });
+    if (mode === "fixed" && !input.fixedAmountMinor)
+      throw invalid("A fixed-fee task needs an amount.", {
+        fields: { fixedAmountMinor: "Enter the fee" },
+      });
     return this.prisma.$transaction(async (tx) => {
-      const max = await tx.task.aggregate({ where: { projectId: project.id }, _max: { position: true } });
+      const max = await tx.task.aggregate({
+        where: { projectId: project.id },
+        _max: { position: true },
+      });
       const t = await tx.task.create({
         data: {
           workspaceId: ctx.workspace.id,
@@ -430,7 +545,12 @@ export class CatalogController {
           position: (max._max.position ?? 0) + 1,
         },
       });
-      await this.events.emit(tx, { ws: ctx.workspace.id, topic: "catalog", action: "task.created", entity: t.id });
+      await this.events.emit(tx, {
+        ws: ctx.workspace.id,
+        topic: "catalog",
+        action: "task.created",
+        entity: t.id,
+      });
       return { id: t.id };
     });
   }
@@ -441,30 +561,43 @@ export class CatalogController {
     const task = await this.prisma.task.findFirst({ where: { id, workspaceId: ctx.workspace.id } });
     if (!task) throw notFound("Task not found");
     const touchesBilling = ["billingMode", "rateMinor", "fixedAmountMinor"].some((k) => k in input);
-    if (touchesBilling && !ctx.isAdmin) throw conflict("forbidden", "Only admins change a task's billing.");
+    if (touchesBilling && !ctx.isAdmin)
+      throw conflict("forbidden", "Only admins change a task's billing.");
     const mode = input.billingMode ?? task.billingMode;
     if (task.billingMode === "fixed" && mode === "hourly") {
       // M9: blocked once part of the fee is billed.
       const billed = (await this.billing.fixedBilled(this.prisma, ctx.workspace.id)).get(id) ?? 0;
       if (billed > 0) {
-        throw conflict("fixed_billed", "Part of this fee is on an invoice. Add a new hourly task for the extra work.");
+        throw conflict(
+          "fixed_billed",
+          "Part of this fee is on an invoice. Add a new hourly task for the extra work.",
+        );
       }
     }
     const fixedAmount = mode === "fixed" ? (input.fixedAmountMinor ?? task.fixedAmountMinor) : null;
-    if (mode === "fixed" && !fixedAmount) throw invalid("A fixed-fee task needs an amount.", { fields: { fixedAmountMinor: "Enter the fee" } });
+    if (mode === "fixed" && !fixedAmount)
+      throw invalid("A fixed-fee task needs an amount.", {
+        fields: { fixedAmountMinor: "Enter the fee" },
+      });
     await this.prisma.$transaction(async (tx) => {
       await tx.task.update({
         where: { id },
         data: {
           ...(input.name ? { name: input.name } : {}),
           billingMode: mode,
-          rateMinor: mode === "hourly" ? ("rateMinor" in input ? input.rateMinor : task.rateMinor) : null,
+          rateMinor:
+            mode === "hourly" ? ("rateMinor" in input ? input.rateMinor : task.rateMinor) : null,
           fixedAmountMinor: fixedAmount,
           ...("estimateSeconds" in input ? { estimateSeconds: input.estimateSeconds } : {}),
           ...("done" in input ? { doneAt: input.done ? new Date() : null } : {}),
         },
       });
-      await this.events.emit(tx, { ws: ctx.workspace.id, topic: "catalog", action: "task.updated", entity: id });
+      await this.events.emit(tx, {
+        ws: ctx.workspace.id,
+        topic: "catalog",
+        action: "task.updated",
+        entity: id,
+      });
     });
     return { ok: true };
   }
@@ -476,7 +609,12 @@ export class CatalogController {
     if (n > 0) throw conflict("has_time", "This task has time entries. Mark it done instead.");
     await this.prisma.$transaction(async (tx) => {
       await tx.task.deleteMany({ where: { id, workspaceId: ctx.workspace.id } });
-      await this.events.emit(tx, { ws: ctx.workspace.id, topic: "catalog", action: "task.deleted", entity: id });
+      await this.events.emit(tx, {
+        ws: ctx.workspace.id,
+        topic: "catalog",
+        action: "task.deleted",
+        entity: id,
+      });
     });
     return { ok: true };
   }

@@ -5,7 +5,17 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef } from "react";
 
 /** A modal <dialog> opened by a URL param (URL is state, Guide §6); closing removes the param. */
-export function UrlDialog({ param, title, children, variant = "dialog" }: { param: string; title: string; children: React.ReactNode; variant?: "dialog" | "panel" }) {
+export function UrlDialog({
+  param,
+  title,
+  children,
+  variant = "dialog",
+}: {
+  param: string;
+  title: string;
+  children: React.ReactNode;
+  variant?: "dialog" | "panel";
+}) {
   const ref = useRef<HTMLDialogElement>(null);
   const router = useRouter();
   const pathname = usePathname();
@@ -24,7 +34,12 @@ export function UrlDialog({ param, title, children, variant = "dialog" }: { para
         <h2 id={`${param}-title`} className="t-title-3">
           {title}
         </h2>
-        <button type="button" className="btn btn-ghost btn-icon" aria-label="Close" onClick={() => ref.current?.close()}>
+        <button
+          type="button"
+          className="btn btn-ghost btn-icon"
+          aria-label="Close"
+          onClick={() => ref.current?.close()}
+        >
           <X size={16} />
         </button>
       </div>
@@ -35,7 +50,11 @@ export function UrlDialog({ param, title, children, variant = "dialog" }: { para
 
 export function CloseButton({ children = "Cancel" }: { children?: React.ReactNode }) {
   return (
-    <button type="button" className="btn btn-secondary" onClick={(e) => e.currentTarget.closest("dialog")?.close()}>
+    <button
+      type="button"
+      className="btn btn-secondary"
+      onClick={(e) => e.currentTarget.closest("dialog")?.close()}
+    >
       {children}
     </button>
   );
