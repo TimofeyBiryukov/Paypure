@@ -157,7 +157,14 @@ function entriesFingerprint(entries: BillableEntry[], layout: LineLayout): strin
   return fingerprint(
     JSON.stringify([
       layout,
-      entries.map((e) => [e.id, e.date, e.seconds, e.taskId, e.rateMinor, layout.showNotes ? e.note : ""]),
+      entries.map((e) => [
+        e.id,
+        e.date,
+        e.seconds,
+        e.taskId,
+        e.rateMinor,
+        layout.showNotes ? e.note : "",
+      ]),
     ]),
   );
 }
@@ -238,7 +245,9 @@ export function buildTimeLines(
   const lines = [...groups.entries()].map(([key, g]) => {
     const base = `${g[0].projectName} · ${g[0].taskName}`;
     const title =
-      layout.mode === "per_task_week" ? `${base} · week of ${formatDayMonth(key.split("|")[1])}` : base;
+      layout.mode === "per_task_week"
+        ? `${base} · week of ${formatDayMonth(key.split("|")[1])}`
+        : base;
     return groupLine(g, layout, title);
   });
   return lines.sort((a, b) => a.title.localeCompare(b.title));
@@ -274,7 +283,16 @@ export function buildFixedLine(input: {
 
 /** 08 §5.1: does an edit to these entry fields change the printed document? */
 export function affectsDocument(changedFields: string[], layout: LineLayout): boolean {
-  const always = ["date", "started_at", "ended_at", "duration_seconds", "task_id", "billable", "segments", "deleted_at"];
+  const always = [
+    "date",
+    "started_at",
+    "ended_at",
+    "duration_seconds",
+    "task_id",
+    "billable",
+    "segments",
+    "deleted_at",
+  ];
   if (changedFields.some((f) => always.includes(f))) return true;
   const notesPrint = layout.mode === "per_entry" || layout.showNotes;
   return notesPrint && changedFields.includes("note");

@@ -40,7 +40,13 @@ export function displayStatus(input: {
   }
   if (input.dueDate && input.dueDate < input.today) {
     const days = daysBetween(input.dueDate, input.today);
-    return { ...base, key: "overdue", label: `Overdue · ${days}d`, tone: "danger", overdueDays: days };
+    return {
+      ...base,
+      key: "overdue",
+      label: `Overdue · ${days}d`,
+      tone: "danger",
+      overdueDays: days,
+    };
   }
   if (input.netPaidMinor > 0) {
     return { ...base, key: "partially_paid", label: "Partially paid", tone: "warning" };

@@ -38,11 +38,19 @@ function due(d: string | null, today: string, status: string) {
   const n = daysBetween(today, d);
   if (n === 0) return "today";
   if (n > 0) return `in ${n} ${n === 1 ? "day" : "days"}`;
-  return <span className="text-danger">{-n} {n === -1 ? "day" : "days"} ago</span>;
+  return (
+    <span className="text-danger">
+      {-n} {n === -1 ? "day" : "days"} ago
+    </span>
+  );
 }
 
 /** Invoices (S10): a sortable table with due date, balance and status chip. */
-export default async function InvoicesPage({ searchParams }: { searchParams: Promise<{ tab?: string; client?: string; void?: string; sort?: string }> }) {
+export default async function InvoicesPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ tab?: string; client?: string; void?: string; sort?: string }>;
+}) {
   const me = (await getMe())!;
   if (!me.isAdmin) redirect("/");
   const sp = await searchParams;
@@ -51,7 +59,11 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Pro
   if (sp.client) qs.set("client", sp.client);
   if (sp.void) qs.set("void", sp.void);
   const [data, catalog] = await Promise.all([
-    api<{ invoices: Row[]; counts: Record<string, number>; stats: Record<string, { currency: string; minor: number }[]> }>(`/v1/invoices?${qs}`),
+    api<{
+      invoices: Row[];
+      counts: Record<string, number>;
+      stats: Record<string, { currency: string; minor: number }[]>;
+    }>(`/v1/invoices?${qs}`),
     api<Catalog>("/v1/catalog"),
   ]);
   const today = todayIn(me.workspace.timeZone);
@@ -92,9 +104,19 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Pro
           </Link>
         ))}
       </nav>
-      <form role="search" method="get" action="/invoices" className="flex gap-2 items-center mb-4 flex-wrap">
+      <form
+        role="search"
+        method="get"
+        action="/invoices"
+        className="flex gap-2 items-center mb-4 flex-wrap"
+      >
         <input type="hidden" name="tab" value={tab} />
-        <AutoSelect name="client" defaultValue={sp.client ?? ""} className="select h-8 py-0 w-auto" aria-label="Client">
+        <AutoSelect
+          name="client"
+          defaultValue={sp.client ?? ""}
+          className="select h-8 py-0 w-auto"
+          aria-label="Client"
+        >
           <option value="">All clients</option>
           {catalog.clients.map((c) => (
             <option key={c.id} value={c.id}>
@@ -138,7 +160,9 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Pro
                 </th>
                 <th className="num">Total</th>
                 <th className="num">
-                  <Link href={href({ sort: "balance" })}>Balance{sort === "balance" ? " ▼" : ""}</Link>
+                  <Link href={href({ sort: "balance" })}>
+                    Balance{sort === "balance" ? " ▼" : ""}
+                  </Link>
                 </th>
                 <th>Status</th>
                 <th>
@@ -150,24 +174,54 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Pro
               {rows.map((i) => (
                 <tr key={i.id}>
                   <td className="font-semibold tnum whitespace-nowrap">
-                    <Link href={`/invoices/${i.id}`} className={i.status === "void" ? "line-through text-faint" : "hover:text-accent"}>
+                    <Link
+                      href={`/invoices/${i.id}`}
+                      className={
+                        i.status === "void" ? "line-through text-faint" : "hover:text-accent"
+                      }
+                    >
                       {i.number ?? "Draft"}
                     </Link>
                     {i.rev > 1 && <span className="t-caption ml-1">rev {i.rev}</span>}
                   </td>
                   <td>
                     <span className="flex items-center gap-2 whitespace-nowrap">
-                      <ClientBadge name={i.client.name} colour={i.client.colour} size={20} /> {i.client.name}
+                      <ClientBadge name={i.client.name} colour={i.client.colour} size={20} />{" "}
+                      {i.client.name}
                     </span>
                   </td>
-                  <td className="text-muted whitespace-nowrap">{i.issueDate ? formatDateLong(i.issueDate) : "—"}</td>
-                  <td className="whitespace-nowrap">{due(i.dueDate, today, i.status)}</td>
-                  <td className="num">{formatMoney({ minor: i.totalMinor, currency: i.currency })}</td>
-                  <td className="num font-semibold">{i.status === "issued" ? formatMoney({ minor: Math.max(0, i.balanceMinor), currency: i.currency }) : <span className="text-faint">—</span>}</td>
-                  <td>
-                    <StatusChip label={i.display.label} tone={i.display.tone} note={i.display.overpaidMinor ? `overpaid ${formatMoney({ minor: i.display.overpaidMinor, currency: i.currency })}` : i.correctionOpen ? "correction open" : undefined} />
+                  <td className="text-muted whitespace-nowrap">
+                    {i.issueDate ? formatDateLong(i.issueDate) : "—"}
                   </td>
-                  <td>{i.viewed && <Eye size={14} className="text-muted" aria-label="Viewed by client" />}</td>
+                  <td className="whitespace-nowrap">{due(i.dueDate, today, i.status)}</td>
+                  <td className="num">
+                    {formatMoney({ minor: i.totalMinor, currency: i.currency })}
+                  </td>
+                  <td className="num font-semibold">
+                    {i.status === "issued" ? (
+                      formatMoney({ minor: Math.max(0, i.balanceMinor), currency: i.currency })
+                    ) : (
+                      <span className="text-faint">—</span>
+                    )}
+                  </td>
+                  <td>
+                    <StatusChip
+                      label={i.display.label}
+                      tone={i.display.tone}
+                      note={
+                        i.display.overpaidMinor
+                          ? `overpaid ${formatMoney({ minor: i.display.overpaidMinor, currency: i.currency })}`
+                          : i.correctionOpen
+                            ? "correction open"
+                            : undefined
+                      }
+                    />
+                  </td>
+                  <td>
+                    {i.viewed && (
+                      <Eye size={14} className="text-muted" aria-label="Viewed by client" />
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>

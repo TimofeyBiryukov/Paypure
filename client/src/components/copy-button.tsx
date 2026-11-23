@@ -2,7 +2,15 @@
 
 import { useState } from "react";
 
-export function CopyButton({ text, label = "Copy", className = "btn btn-secondary" }: { text: string; label?: string; className?: string }) {
+export function CopyButton({
+  text,
+  label = "Copy",
+  className = "btn btn-secondary",
+}: {
+  text: string;
+  label?: string;
+  className?: string;
+}) {
   const [done, setDone] = useState(false);
   return (
     <button

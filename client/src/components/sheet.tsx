@@ -32,7 +32,12 @@ export function InvoiceSheet({ s, scale }: { s: SheetData; scale?: number }) {
         <div
           aria-hidden
           className="pointer-events-none absolute inset-0 flex items-center justify-center overflow-hidden"
-          style={{ color: "rgba(179,38,30,.13)", fontSize: 64, fontWeight: 700, transform: "rotate(-30deg)" }}
+          style={{
+            color: "rgba(179,38,30,.13)",
+            fontSize: 64,
+            fontWeight: 700,
+            transform: "rotate(-30deg)",
+          }}
         >
           DRAFT · not a valid invoice
         </div>
@@ -108,14 +113,24 @@ export function InvoiceSheet({ s, scale }: { s: SheetData; scale?: number }) {
             <tr key={i} className="border-b border-[#E4E1DB] align-top sheet-line">
               <td className="py-2.5 pr-4">
                 <div className={l.kind === "manual" ? "whitespace-pre-line" : "font-semibold"}>
-                  {l.kind === "discount" ? `Discount${l.discountRateBp ? ` ${formatPercentBp(l.discountRateBp)}` : ""}` : l.title}
+                  {l.kind === "discount"
+                    ? `Discount${l.discountRateBp ? ` ${formatPercentBp(l.discountRateBp)}` : ""}`
+                    : l.title}
                 </div>
                 {l.detail && <SheetNote text={l.detail} />}
               </td>
               <td className="py-2.5 text-right whitespace-nowrap">
-                {l.kind === "discount" ? "" : l.unit === "h" ? `${formatHundredths(l.qtyHundredths)} h` : l.unit === "fixed" ? "1" : `${formatHundredths(l.qtyHundredths).replace(/\.00$/, "")}${l.unit ? ` ${l.unit}` : ""}`}
+                {l.kind === "discount"
+                  ? ""
+                  : l.unit === "h"
+                    ? `${formatHundredths(l.qtyHundredths)} h`
+                    : l.unit === "fixed"
+                      ? "1"
+                      : `${formatHundredths(l.qtyHundredths).replace(/\.00$/, "")}${l.unit ? ` ${l.unit}` : ""}`}
               </td>
-              <td className="py-2.5 text-right whitespace-nowrap">{l.kind === "discount" ? "" : m(l.rateMinor)}</td>
+              <td className="py-2.5 text-right whitespace-nowrap">
+                {l.kind === "discount" ? "" : m(l.rateMinor)}
+              </td>
               <td className="py-2.5 text-right whitespace-nowrap">{m(l.amountMinor)}</td>
             </tr>
           ))}
@@ -146,7 +161,9 @@ export function InvoiceSheet({ s, scale }: { s: SheetData; scale?: number }) {
           <div className="flex justify-between py-2 mt-1 border-t border-[#1B1A18] font-semibold text-[15px]">
             <dt>Total</dt>
             {/* On documents the code is always shown on totals (Guide §5.7) */}
-            <dd>{formatMoney({ minor: s.totalMinor, currency: s.currency }, { withCode: true })}</dd>
+            <dd>
+              {formatMoney({ minor: s.totalMinor, currency: s.currency }, { withCode: true })}
+            </dd>
           </div>
         </dl>
       </section>

@@ -4,19 +4,22 @@
  *   docker compose exec api pnpm --filter api cli seed:demo
  */
 import { createHash, randomBytes } from "node:crypto";
-import { PrismaPg } from "@prisma/adapter-pg";
 import { addDays, fromWallTime, todayIn, toLocalDate } from "@paypure/domain";
+import { PrismaPg } from "@prisma/adapter-pg";
 import * as argon2 from "argon2";
 import { PrismaClient } from "./generated/prisma/client";
 import { DEFAULT_TEMPLATES } from "./modules/invoice-ops";
 
-const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL as string }) });
+const prisma = new PrismaClient({
+  adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL as string }),
+});
 
 function args() {
   const out: Record<string, string> = {};
   const a = process.argv.slice(3);
   for (let i = 0; i < a.length; i++) {
-    if (a[i].startsWith("--")) out[a[i].slice(2)] = a[i + 1]?.startsWith("--") || a[i + 1] === undefined ? "true" : a[++i];
+    if (a[i].startsWith("--"))
+      out[a[i].slice(2)] = a[i + 1]?.startsWith("--") || a[i + 1] === undefined ? "true" : a[++i];
   }
   return out;
 }
@@ -44,7 +47,14 @@ async function createWorkspace(o: {
     },
   });
   for (const [kind, t] of Object.entries(DEFAULT_TEMPLATES)) {
-    await prisma.emailTemplate.create({ data: { workspaceId: ws.id, kind: kind as keyof typeof DEFAULT_TEMPLATES, subject: t.subject, body: t.body } });
+    await prisma.emailTemplate.create({
+      data: {
+        workspaceId: ws.id,
+        kind: kind as keyof typeof DEFAULT_TEMPLATES,
+        subject: t.subject,
+        body: t.body,
+      },
+    });
   }
   if (o.next) {
     const period = (o.reset ?? "yearly") === "yearly" ? todayIn(tz).slice(0, 4) : "";
@@ -63,7 +73,11 @@ async function createWorkspace(o: {
       inviteToken: o.password ? null : createHash("sha256").update(token).digest("hex"),
     },
   });
-  return { ws, admin, inviteUrl: `${process.env.PUBLIC_URL ?? "http://localhost:3000"}/invite/${token}` };
+  return {
+    ws,
+    admin,
+    inviteUrl: `${process.env.PUBLIC_URL ?? "http://localhost:3000"}/invite/${token}`,
+  };
 }
 
 async function seedDemo() {
@@ -140,30 +154,103 @@ async function seedDemo() {
     },
   });
   const acme = await prisma.client.create({
-    data: { workspaceId: ws.id, name: "Acme Co", contactName: "Wile E. Coyote", billingEmails: ["jane@acme.example"], address: "1 Desert Road\nTucson, AZ 85701\nUSA", currency: "USD", rateMinor: 6000, colour: 0, termsDays: 14 },
+    data: {
+      workspaceId: ws.id,
+      name: "Acme Co",
+      contactName: "Wile E. Coyote",
+      billingEmails: ["jane@acme.example"],
+      address: "1 Desert Road\nTucson, AZ 85701\nUSA",
+      currency: "USD",
+      rateMinor: 6000,
+      colour: 0,
+      termsDays: 14,
+    },
   });
   const globex = await prisma.client.create({
-    data: { workspaceId: ws.id, name: "Globex", contactName: "Hank Scorpio", billingEmails: ["ap@globex.example"], address: "Cypress Creek 1\nUSA", currency: "EUR", colour: 1 },
+    data: {
+      workspaceId: ws.id,
+      name: "Globex",
+      contactName: "Hank Scorpio",
+      billingEmails: ["ap@globex.example"],
+      address: "Cypress Creek 1\nUSA",
+      currency: "EUR",
+      colour: 1,
+    },
   });
   const initech = await prisma.client.create({
-    data: { workspaceId: ws.id, name: "Initech", contactName: "Bill Lumbergh", billingEmails: ["bill@initech.example"], address: "4120 Freidrich Ln\nAustin, TX", currency: "USD", rateMinor: 3250, colour: 2 },
+    data: {
+      workspaceId: ws.id,
+      name: "Initech",
+      contactName: "Bill Lumbergh",
+      billingEmails: ["bill@initech.example"],
+      address: "4120 Freidrich Ln\nAustin, TX",
+      currency: "USD",
+      rateMinor: 3250,
+      colour: 2,
+    },
   });
-  const mk = async (clientId: string, name: string, tasks: { name: string; mode?: "hourly" | "fixed" | "non_billable"; fixed?: number; rate?: number }[], rate?: number, budget?: { kind: "hours" | "money"; value: number }) => {
-    const p = await prisma.project.create({ data: { workspaceId: ws.id, clientId, name, rateMinor: rate ?? null, budgetKind: budget?.kind ?? null, budgetValue: budget?.value ?? null } });
+  const mk = async (
+    clientId: string,
+    name: string,
+    tasks: {
+      name: string;
+      mode?: "hourly" | "fixed" | "non_billable";
+      fixed?: number;
+      rate?: number;
+    }[],
+    rate?: number,
+    budget?: { kind: "hours" | "money"; value: number },
+  ) => {
+    const p = await prisma.project.create({
+      data: {
+        workspaceId: ws.id,
+        clientId,
+        name,
+        rateMinor: rate ?? null,
+        budgetKind: budget?.kind ?? null,
+        budgetValue: budget?.value ?? null,
+      },
+    });
     const ts = [];
     let pos = 0;
     for (const t of tasks) {
       ts.push(
         await prisma.task.create({
-          data: { workspaceId: ws.id, projectId: p.id, name: t.name, billingMode: t.mode ?? "hourly", fixedAmountMinor: t.mode === "fixed" ? t.fixed : null, rateMinor: t.rate ?? null, position: pos++ },
+          data: {
+            workspaceId: ws.id,
+            projectId: p.id,
+            name: t.name,
+            billingMode: t.mode ?? "hourly",
+            fixedAmountMinor: t.mode === "fixed" ? t.fixed : null,
+            rateMinor: t.rate ?? null,
+            position: pos++,
+          },
         }),
       );
     }
     return ts;
   };
-  const [design, dev, meetings] = await mk(acme.id, "Website", [{ name: "Design" }, { name: "Development" }, { name: "Internal meetings", mode: "non_billable" }], undefined, { kind: "money", value: 500000 });
-  const [logo] = await mk(acme.id, "Brand refresh", [{ name: "Logo design", mode: "fixed", fixed: 120000 }]);
-  const [api, support] = await mk(globex.id, "Platform API", [{ name: "Backend" }, { name: "Support", rate: 7500 }], 9500, { kind: "hours", value: 100 * 3600 });
+  const [design, dev, meetings] = await mk(
+    acme.id,
+    "Website",
+    [
+      { name: "Design" },
+      { name: "Development" },
+      { name: "Internal meetings", mode: "non_billable" },
+    ],
+    undefined,
+    { kind: "money", value: 500000 },
+  );
+  const [logo] = await mk(acme.id, "Brand refresh", [
+    { name: "Logo design", mode: "fixed", fixed: 120000 },
+  ]);
+  const [api, support] = await mk(
+    globex.id,
+    "Platform API",
+    [{ name: "Backend" }, { name: "Support", rate: 7500 }],
+    9500,
+    { kind: "hours", value: 100 * 3600 },
+  );
   const [legacy] = await mk(initech.id, "TPS reports", [{ name: "Maintenance" }]);
 
   const today = todayIn(tz);
@@ -176,7 +263,15 @@ async function seedDemo() {
     "Wireframes for the pricing page",
   ];
   let n = 0;
-  const entry = async (memberId: string, taskId: string, date: string, from: string, to: string, note: string, pauses: [string, string][] = []) => {
+  const entry = async (
+    memberId: string,
+    taskId: string,
+    date: string,
+    from: string,
+    to: string,
+    note: string,
+    pauses: [string, string][] = [],
+  ) => {
     const start = fromWallTime(date, from, tz);
     const end = fromWallTime(date, to, tz);
     if (!start.ok || !end.ok) return;
@@ -206,7 +301,9 @@ async function seedDemo() {
         durationSeconds: Math.round(dur),
         note,
         billable: task.billingMode === "hourly",
-        segments: { create: bounds.map(([a, b]) => ({ workspaceId: ws.id, startedAt: a, endedAt: b })) },
+        segments: {
+          create: bounds.map(([a, b]) => ({ workspaceId: ws.id, startedAt: a, endedAt: b })),
+        },
       },
     });
     n++;
@@ -217,14 +314,39 @@ async function seedDemo() {
     const wd = new Date(`${date}T12:00:00Z`).getUTCDay();
     if (wd === 0 || wd === 6) continue;
     const i = d + 40;
-    await entry(admin.id, [design.id, dev.id, api.id][i % 3], date, "09:00", "12:30", notes[i % notes.length], i % 2 ? [["10:40", "10:55"]] : []);
+    await entry(
+      admin.id,
+      [design.id, dev.id, api.id][i % 3],
+      date,
+      "09:00",
+      "12:30",
+      notes[i % notes.length],
+      i % 2 ? [["10:40", "10:55"]] : [],
+    );
     if (d === 0) continue; // leave today's afternoon as a gap to fill
-    await entry(admin.id, [dev.id, support.id, legacy.id, logo.id][i % 4], date, "13:15", i % 5 === 0 ? "16:00" : "17:40", notes[(i + 2) % notes.length]);
+    await entry(
+      admin.id,
+      [dev.id, support.id, legacy.id, logo.id][i % 4],
+      date,
+      "13:15",
+      i % 5 === 0 ? "16:00" : "17:40",
+      notes[(i + 2) % notes.length],
+    );
     if (i % 4 === 0) await entry(member.id, meetings.id, date, "10:00", "10:45", "Weekly sync");
-    if (i % 3 === 0) await entry(member.id, design.id, date, "11:00", "15:30", notes[(i + 1) % notes.length], [["12:30", "13:00"]]);
+    if (i % 3 === 0)
+      await entry(member.id, design.id, date, "11:00", "15:30", notes[(i + 1) % notes.length], [
+        ["12:30", "13:00"],
+      ]);
   }
   // Stale time from long ago (F8: clearing stale unbilled time).
-  await entry(admin.id, legacy.id, addDays(today, -400), "09:00", "11:30", "Old maintenance work never invoiced");
+  await entry(
+    admin.id,
+    legacy.id,
+    addDays(today, -400),
+    "09:00",
+    "11:30",
+    "Old maintenance work never invoiced",
+  );
 
   console.log(`Demo workspace ready with ${n} time entries.
   Admin:  admin@example.com / paypure-demo
@@ -237,7 +359,9 @@ async function main() {
   const a = args();
   if (cmd === "workspace:create") {
     if (!a.name || !a["admin-email"]) {
-      console.error("Usage: workspace:create --name <name> --admin-email <email> [--currency EUR] [--tz Europe/Berlin] [--format {seq:3}] [--reset never] [--next 188]");
+      console.error(
+        "Usage: workspace:create --name <name> --admin-email <email> [--currency EUR] [--tz Europe/Berlin] [--format {seq:3}] [--reset never] [--next 188]",
+      );
       process.exit(1);
     }
     const r = await createWorkspace({
@@ -250,7 +374,9 @@ async function main() {
       reset: a.reset as "never" | "yearly" | undefined,
       next: a.next ? Number(a.next) : undefined,
     });
-    console.log(`Workspace "${r.ws.name}" created. One-time invite link for ${r.admin.email}:\n${r.inviteUrl}`);
+    console.log(
+      `Workspace "${r.ws.name}" created. One-time invite link for ${r.admin.email}:\n${r.inviteUrl}`,
+    );
   } else if (cmd === "seed:demo") {
     await seedDemo();
   } else {

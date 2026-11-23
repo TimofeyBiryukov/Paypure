@@ -42,7 +42,8 @@ export function ratePill(
   if (mode === "fixed" && fixed) {
     const fee = formatMoney({ minor: fixed.amountMinor, currency });
     if (fixed.billedMinor <= 0) return { text: `${fee} fixed`, tone: "neutral" };
-    if (fixed.billedMinor >= fixed.amountMinor) return { text: `${fee} fixed · billed`, tone: "neutral" };
+    if (fixed.billedMinor >= fixed.amountMinor)
+      return { text: `${fee} fixed · billed`, tone: "neutral" };
     return {
       text: `${fee} fixed · ${formatMoney({ minor: fixed.billedMinor, currency })} billed`,
       tone: "neutral",
@@ -50,7 +51,10 @@ export function ratePill(
   }
   if (!resolved) return { text: "No rate", tone: "warning" };
   const r = `${formatMoney({ minor: resolved.rateMinor, currency })}/h`;
-  return { text: resolved.source === "task" ? r : `${r} · from ${resolved.source}`, tone: "neutral" };
+  return {
+    text: resolved.source === "task" ? r : `${r} · from ${resolved.source}`,
+    tone: "neutral",
+  };
 }
 
 /** 07 §4.2: remaining fee, never negative. */

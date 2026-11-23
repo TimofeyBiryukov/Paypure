@@ -37,14 +37,19 @@ export function TaskPicker({
   const id = useId();
   const [value, setValue] = useState<string>(defaultTaskId ?? "");
   const selected = tasks.find((t) => t.id === value);
-  const [query, setQuery] = useState(selected ? `${selected.clientName} / ${selected.projectName} › ${selected.name}` : "");
+  const [query, setQuery] = useState(
+    selected ? `${selected.clientName} / ${selected.projectName} › ${selected.name}` : "",
+  );
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const hiddenRef = useRef<HTMLInputElement>(null);
 
   const results = useMemo(() => {
-    const tokens = query.toLowerCase().split(/[\s/›]+/).filter(Boolean);
+    const tokens = query
+      .toLowerCase()
+      .split(/[\s/›]+/)
+      .filter(Boolean);
     const showAll = !!selected && query.startsWith(selected.clientName);
     const list = tasks.filter((t) => {
       if (showAll || tokens.length === 0) return true;
@@ -71,10 +76,16 @@ export function TaskPicker({
     }
   };
 
-  const tokens = query.toLowerCase().split(/[\s/›]+/).filter(Boolean);
+  const tokens = query
+    .toLowerCase()
+    .split(/[\s/›]+/)
+    .filter(Boolean);
   const hl = (s: string) => {
     if (!tokens.length) return s;
-    const re = new RegExp(`(${tokens.map((t) => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|")})`, "ig");
+    const re = new RegExp(
+      `(${tokens.map((t) => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|")})`,
+      "ig",
+    );
     return s.split(re).map((part, i) =>
       // biome-ignore lint/suspicious/noArrayIndexKey: text fragments
       re.test(part) ? <b key={i}>{part}</b> : <span key={i}>{part}</span>,
@@ -94,7 +105,9 @@ export function TaskPicker({
         aria-expanded={open}
         aria-controls={`${id}-list`}
         aria-autocomplete="list"
-        aria-activedescendant={open && results[active] ? `${id}-opt-${results[active].id}` : undefined}
+        aria-activedescendant={
+          open && results[active] ? `${id}-opt-${results[active].id}` : undefined
+        }
         autoComplete="off"
         autoFocus={autoFocus}
         placeholder={placeholder}
@@ -135,10 +148,16 @@ export function TaskPicker({
         tabIndex={-1}
         aria-hidden
         className="absolute opacity-0 pointer-events-none h-0 w-0 bottom-0 left-4"
-        onInvalid={(e) => (e.target as HTMLInputElement).setCustomValidity(value ? "" : "Choose a task")}
+        onInvalid={(e) =>
+          (e.target as HTMLInputElement).setCustomValidity(value ? "" : "Choose a task")
+        }
       />
       {open && results.length > 0 && (
-        <ul id={`${id}-list`} role="listbox" className="pop absolute z-50 mt-1 w-full max-h-72 overflow-auto p-1">
+        <ul
+          id={`${id}-list`}
+          role="listbox"
+          className="pop absolute z-50 mt-1 w-full max-h-72 overflow-auto p-1"
+        >
           {results.map((t, i) => {
             const groupStart = i === 0 || results[i - 1].projectId !== t.projectId;
             return (
@@ -164,7 +183,9 @@ export function TaskPicker({
                 >
                   {hl(t.name)}
                   {t.billingMode !== "hourly" && (
-                    <span className="t-caption ml-2">{t.billingMode === "fixed" ? "Fixed fee" : "Non-billable"}</span>
+                    <span className="t-caption ml-2">
+                      {t.billingMode === "fixed" ? "Fixed fee" : "Non-billable"}
+                    </span>
                   )}
                 </div>
               </li>
@@ -173,7 +194,9 @@ export function TaskPicker({
         </ul>
       )}
       {open && results.length === 0 && (
-        <div className="pop absolute z-50 mt-1 w-full p-3 text-muted">No task matches “{query}”. Admins add tasks on the project page.</div>
+        <div className="pop absolute z-50 mt-1 w-full p-3 text-muted">
+          No task matches “{query}”. Admins add tasks on the project page.
+        </div>
       )}
     </div>
   );

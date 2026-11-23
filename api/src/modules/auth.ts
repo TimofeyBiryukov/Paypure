@@ -22,7 +22,11 @@ export class AuthController {
     const now = Date.now();
     const a = this.attempts.get(key);
     if (a && a.until > now && a.n >= 10) {
-      throw new ApiError(429, "too_many_attempts", "Too many attempts. Try again in a few minutes.");
+      throw new ApiError(
+        429,
+        "too_many_attempts",
+        "Too many attempts. Try again in a few minutes.",
+      );
     }
     if (!a || a.until <= now) this.attempts.set(key, { n: 1, until: now + 600_000 });
     else a.n++;
@@ -48,8 +52,11 @@ export class AuthController {
     const email = input.email.toLowerCase();
     this.throttle(email);
     const member = await this.prisma.member.findFirst({ where: { email, status: "active" } });
-    const ok = member?.passwordHash ? await argon2.verify(member.passwordHash, input.password) : false;
-    if (!member || !ok) throw new ApiError(401, "bad_credentials", "That email and password don't match.");
+    const ok = member?.passwordHash
+      ? await argon2.verify(member.passwordHash, input.password)
+      : false;
+    if (!member || !ok)
+      throw new ApiError(401, "bad_credentials", "That email and password don't match.");
     this.attempts.delete(email);
     // Seed the member zone from the device on first login (06 §3.4).
     if (input.tz && isValidTimeZone(input.tz) && member.timeZone === "UTC") {
@@ -63,9 +70,15 @@ export class AuthController {
   @HttpCode(200)
   async acceptInvite(@Body() body: unknown) {
     const input = parse(AcceptInviteInput, body);
-    const member = await this.prisma.member.findUnique({ where: { inviteToken: hashToken(input.token) } });
+    const member = await this.prisma.member.findUnique({
+      where: { inviteToken: hashToken(input.token) },
+    });
     if (!member || member.status === "deactivated") {
-      throw new ApiError(404, "invite_invalid", "This invite link is no longer valid. Ask an admin for a new one.");
+      throw new ApiError(
+        404,
+        "invite_invalid",
+        "This invite link is no longer valid. Ask an admin for a new one.",
+      );
     }
     await this.prisma.member.update({
       where: { id: member.id },
@@ -84,7 +97,12 @@ export class AuthController {
   async logout(@C() ctx: Ctx) {
     await this.prisma.$transaction(async (tx) => {
       await tx.session.delete({ where: { id: ctx.sessionId } });
-      await this.events.emit(tx, { ws: ctx.workspace.id, member: ctx.member.id, topic: "session", action: "logout" });
+      await this.events.emit(tx, {
+        ws: ctx.workspace.id,
+        member: ctx.member.id,
+        topic: "session",
+        action: "logout",
+      });
     });
     return { ok: true };
   }

@@ -4,14 +4,17 @@ import { parseDuration, parseMoney } from "@paypure/domain";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { type ActionState, run, str } from "@/lib/action";
-import { api, ApiError } from "@/server/api";
+import { ApiError, api } from "@/server/api";
 
 /** Money field → minor units, or null when empty. Throws a field error when unreadable. */
 function money(fd: FormData, key: string, currency: string): number | null {
   const raw = str(fd, key);
   if (!raw) return null;
   const v = parseMoney(raw, currency);
-  if (v == null || v < 0) throw new ApiError(422, "invalid", "Some fields need attention.", { [key]: "Enter an amount like 90 or 90.50" });
+  if (v == null || v < 0)
+    throw new ApiError(422, "invalid", "Some fields need attention.", {
+      [key]: "Enter an amount like 90 or 90.50",
+    });
   return v;
 }
 
@@ -19,7 +22,10 @@ function hours(fd: FormData, key: string): number | null {
   const raw = str(fd, key);
   if (!raw) return null;
   const v = parseDuration(raw);
-  if (v == null) throw new ApiError(422, "invalid", "Some fields need attention.", { [key]: "Enter hours like 12, 1.5 or 1h30" });
+  if (v == null)
+    throw new ApiError(422, "invalid", "Some fields need attention.", {
+      [key]: "Enter hours like 12, 1.5 or 1h30",
+    });
   return v;
 }
 
@@ -37,7 +43,8 @@ function clientBody(fd: FormData, currency: string) {
     rateMinor: money(fd, "rate", currency),
   };
   for (const k of ["contactName", "address", "taxId", "notes"]) if (fd.has(k)) body[k] = str(fd, k);
-  if (fd.has("termsDays")) body.termsDays = str(fd, "termsDays") ? Number(str(fd, "termsDays")) : null;
+  if (fd.has("termsDays"))
+    body.termsDays = str(fd, "termsDays") ? Number(str(fd, "termsDays")) : null;
   if (str(fd, "colour")) body.colour = Number(str(fd, "colour"));
   if (str(fd, "currency")) body.currency = str(fd, "currency");
   return body;
@@ -71,7 +78,9 @@ export async function archiveClient(_: ActionState, fd: FormData): Promise<Actio
     const id = str(fd, "id");
     await api(`/v1/clients/${id}/archive`, { body: {} });
     revalidatePath("/", "layout");
-    return { toast: { text: "Client archived", undo: { action: "unarchiveClient", payload: { id } } } };
+    return {
+      toast: { text: "Client archived", undo: { action: "unarchiveClient", payload: { id } } },
+    };
   });
 }
 
@@ -97,7 +106,9 @@ export async function deleteClient(_: ActionState, fd: FormData): Promise<Action
 export async function duplicateInvoice(_: ActionState, fd: FormData): Promise<ActionState> {
   let id = "";
   const r = await run(async () => {
-    const res = await api<{ id: string }>(`/v1/invoices/${str(fd, "invoiceId")}/duplicate`, { body: {} });
+    const res = await api<{ id: string }>(`/v1/invoices/${str(fd, "invoiceId")}/duplicate`, {
+      body: {},
+    });
     id = res.id;
     revalidatePath("/", "layout");
   });
@@ -109,7 +120,11 @@ export async function createProject(_: ActionState, fd: FormData): Promise<Actio
   let id = "";
   const r = await run(async () => {
     const res = await api<{ id: string }>("/v1/projects", {
-      body: { clientId: str(fd, "clientId"), name: str(fd, "name"), rateMinor: money(fd, "rate", str(fd, "currency")) },
+      body: {
+        clientId: str(fd, "clientId"),
+        name: str(fd, "name"),
+        rateMinor: money(fd, "rate", str(fd, "currency")),
+      },
     });
     id = res.id;
     revalidatePath("/", "layout");
@@ -160,7 +175,10 @@ export async function updateTask(_: ActionState, fd: FormData): Promise<ActionSt
     if (mode === "hourly") body.rateMinor = money(fd, "rate", currency);
     if (mode === "fixed") {
       const fee = money(fd, "fixedAmount", currency);
-      if (!fee) throw new ApiError(422, "invalid", "Some fields need attention.", { fixedAmount: "Enter the fee" });
+      if (!fee)
+        throw new ApiError(422, "invalid", "Some fields need attention.", {
+          fixedAmount: "Enter the fee",
+        });
       body.fixedAmountMinor = fee;
     }
     await api(`/v1/tasks/${str(fd, "id")}`, { method: "PATCH", body });

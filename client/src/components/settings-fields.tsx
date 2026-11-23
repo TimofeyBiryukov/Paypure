@@ -37,7 +37,15 @@ export function Field({
         {label}
       </label>
       {textarea ? (
-        <textarea id={id} name={name} className="textarea" defaultValue={defaultValue ?? ""} placeholder={placeholder} rows={rows ?? 3} aria-describedby={`${name}-error`} />
+        <textarea
+          id={id}
+          name={name}
+          className="textarea"
+          defaultValue={defaultValue ?? ""}
+          placeholder={placeholder}
+          rows={rows ?? 3}
+          aria-describedby={`${name}-error`}
+        />
       ) : (
         <input
           id={id}

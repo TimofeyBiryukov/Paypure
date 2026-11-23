@@ -9,7 +9,12 @@ export type Tx = Prisma.TransactionClient;
 export class PrismaService extends PrismaClient implements OnModuleDestroy {
   constructor() {
     // The app role can't disable triggers (08 §3.3); fall back to the owner only if unset.
-    super({ adapter: new PrismaPg({ connectionString: env.APP_DATABASE_URL ?? env.DATABASE_URL, max: 10 }) });
+    super({
+      adapter: new PrismaPg({
+        connectionString: env.APP_DATABASE_URL ?? env.DATABASE_URL,
+        max: 10,
+      }),
+    });
   }
   async onModuleDestroy() {
     await this.$disconnect();

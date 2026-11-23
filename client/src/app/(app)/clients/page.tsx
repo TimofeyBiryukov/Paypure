@@ -21,13 +21,18 @@ interface ClientRow {
 type M = { currency: string; minor: number };
 
 /** Clients (S5): every client and its money position. */
-export default async function ClientsPage({ searchParams }: { searchParams: Promise<{ archived?: string; q?: string }> }) {
+export default async function ClientsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ archived?: string; q?: string }>;
+}) {
   const me = (await getMe())!;
   const { archived, q = "" } = await searchParams;
   const showArchived = archived === "1";
-  const data = await api<{ clients: ClientRow[]; totals?: { unbilled: M[]; outstanding: M[]; overdue: M[] } }>(
-    `/v1/clients${showArchived ? "?archived=1" : ""}`,
-  );
+  const data = await api<{
+    clients: ClientRow[];
+    totals?: { unbilled: M[]; outstanding: M[]; overdue: M[] };
+  }>(`/v1/clients${showArchived ? "?archived=1" : ""}`);
   const query = q.trim().toLowerCase();
   const rows = data.clients.filter((c) => !query || c.name.toLowerCase().includes(query));
   // Footer totals recalculate with the search instead of hiding (⟵ PD).
@@ -62,7 +67,14 @@ export default async function ClientsPage({ searchParams }: { searchParams: Prom
           <label htmlFor="client-q" className="sr-only">
             Search clients
           </label>
-          <input id="client-q" name="q" type="search" defaultValue={q} placeholder="Search clients" className="input w-56" />
+          <input
+            id="client-q"
+            name="q"
+            type="search"
+            defaultValue={q}
+            placeholder="Search clients"
+            className="input w-56"
+          />
           <button type="submit" className="btn btn-secondary">
             Search
           </button>
@@ -107,21 +119,38 @@ export default async function ClientsPage({ searchParams }: { searchParams: Prom
                 {rows.map((c) => (
                   <tr key={c.id}>
                     <td>
-                      <Link href={`/clients/${c.id}`} className="flex items-center gap-2 font-semibold hover:text-accent">
+                      <Link
+                        href={`/clients/${c.id}`}
+                        className="flex items-center gap-2 font-semibold hover:text-accent"
+                      >
                         <ClientBadge name={c.name} colour={c.colour} /> {c.name}
                       </Link>
                     </td>
-                    <td className="num">{c.activeProjects || <span className="text-faint">—</span>}</td>
-                    <td className="num">{c.secondsThisMonth ? formatHoursMinutes(c.secondsThisMonth) : <span className="text-faint">—</span>}</td>
+                    <td className="num">
+                      {c.activeProjects || <span className="text-faint">—</span>}
+                    </td>
+                    <td className="num">
+                      {c.secondsThisMonth ? (
+                        formatHoursMinutes(c.secondsThisMonth)
+                      ) : (
+                        <span className="text-faint">—</span>
+                      )}
+                    </td>
                     {money && (
                       <>
                         <td className="num">
                           <Money m={{ minor: c.unbilledMinor ?? 0, currency: c.currency }} dash />
                         </td>
                         <td className="num">
-                          <Money m={{ minor: c.outstandingMinor ?? 0, currency: c.currency }} dash />
+                          <Money
+                            m={{ minor: c.outstandingMinor ?? 0, currency: c.currency }}
+                            dash
+                          />
                         </td>
-                        <td className="num" style={c.overdueMinor ? { color: "var(--danger-fg)" } : undefined}>
+                        <td
+                          className="num"
+                          style={c.overdueMinor ? { color: "var(--danger-fg)" } : undefined}
+                        >
                           <Money m={{ minor: c.overdueMinor ?? 0, currency: c.currency }} dash />
                         </td>
                       </>
@@ -159,7 +188,9 @@ export default async function ClientsPage({ searchParams }: { searchParams: Prom
                   {money && (
                     <span className="text-right">
                       <Money m={{ minor: c.unbilledMinor ?? 0, currency: c.currency }} dash />
-                      {(c.overdueMinor ?? 0) > 0 && <span className="chip chip-danger block mt-1">Overdue</span>}
+                      {(c.overdueMinor ?? 0) > 0 && (
+                        <span className="chip chip-danger block mt-1">Overdue</span>
+                      )}
                     </span>
                   )}
                 </Link>

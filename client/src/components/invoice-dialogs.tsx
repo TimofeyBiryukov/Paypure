@@ -24,26 +24,58 @@ export interface EmailPreview {
  * S12: one dialog for send, correction and reminder. A hidden idempotency key, made when the
  * dialog opens, means a double submit sends once (08 §7.2).
  */
-export function SendForm({ invoiceId, clientId, preview, isFirst, changeSummary, today }: { invoiceId: string; clientId: string; preview: EmailPreview; isFirst: boolean; changeSummary?: string; today: string }) {
+export function SendForm({
+  invoiceId,
+  clientId,
+  preview,
+  isFirst,
+  changeSummary,
+  today,
+}: {
+  invoiceId: string;
+  clientId: string;
+  preview: EmailPreview;
+  isFirst: boolean;
+  changeSummary?: string;
+  today: string;
+}) {
   const [key] = useState(() => crypto.randomUUID());
   const [testKey] = useState(() => crypto.randomUUID());
   const [to, setTo] = useState(preview.to.join(", "));
-  const label = preview.kind === "correction" ? "Send correction" : preview.kind === "reminder" ? "Send reminder" : "Send invoice";
+  const label =
+    preview.kind === "correction"
+      ? "Send correction"
+      : preview.kind === "reminder"
+        ? "Send reminder"
+        : "Send invoice";
   return (
     <ActionForm action={sendInvoice} closeDialog className="space-y-4">
       <input type="hidden" name="invoiceId" value={invoiceId} />
       <input type="hidden" name="clientId" value={clientId} />
       <input type="hidden" name="idempotencyKey" value={key} />
       <input type="hidden" name="me" value={preview.me} />
-      {preview.noPaymentAccount && <p className="banner banner-warning text-sm">No payment account for {preview.currency}. You can still send.</p>}
+      {preview.noPaymentAccount && (
+        <p className="banner banner-warning text-sm">
+          No payment account for {preview.currency}. You can still send.
+        </p>
+      )}
       <div>
         <label className="label" htmlFor="send-to">
           To
         </label>
-        <input id="send-to" name="to" className="input" value={to} onChange={(e) => setTo(e.target.value)} placeholder="jane@acme.co" autoComplete="off" />
+        <input
+          id="send-to"
+          name="to"
+          className="input"
+          value={to}
+          onChange={(e) => setTo(e.target.value)}
+          placeholder="jane@acme.co"
+          autoComplete="off"
+        />
         {preview.to.length === 0 && (
           <label className="flex items-center gap-2 mt-1 text-sm">
-            <input type="checkbox" name="saveEmails" defaultChecked /> Also save as the client's billing email
+            <input type="checkbox" name="saveEmails" defaultChecked /> Also save as the client's
+            billing email
           </label>
         )}
         <FieldError name="to" />
@@ -64,7 +96,14 @@ export function SendForm({ invoiceId, clientId, preview, isFirst, changeSummary,
           <label className="label" htmlFor="send-issue">
             Issue date
           </label>
-          <input id="send-issue" type="date" name="issueDate" className="input w-auto" defaultValue={preview.issueDate} max={today} />
+          <input
+            id="send-issue"
+            type="date"
+            name="issueDate"
+            className="input w-auto"
+            defaultValue={preview.issueDate}
+            max={today}
+          />
           <p className="hint">The number is assigned when you send.</p>
         </div>
       )}
@@ -73,36 +112,69 @@ export function SendForm({ invoiceId, clientId, preview, isFirst, changeSummary,
           <label className="label" htmlFor="send-changes">
             What changed (printed in the email and on the public page)
           </label>
-          <textarea id="send-changes" name="changeSummary" className="textarea" required defaultValue={changeSummary} />
+          <textarea
+            id="send-changes"
+            name="changeSummary"
+            className="textarea"
+            required
+            defaultValue={changeSummary}
+          />
         </div>
       )}
       <div>
         <label className="label" htmlFor="send-subject">
           Subject
         </label>
-        <input id="send-subject" name="subject" className="input" defaultValue={preview.subject} required />
+        <input
+          id="send-subject"
+          name="subject"
+          className="input"
+          defaultValue={preview.subject}
+          required
+        />
       </div>
       <div>
         <label className="label" htmlFor="send-message">
           Message
         </label>
-        <textarea id="send-message" name="message" className="textarea" rows={8} defaultValue={preview.message} required />
-        {preview.missing.length > 0 && <p className="error-text">Fill in: {preview.missing.map((m) => `{{${m}}}`).join(", ")}</p>}
+        <textarea
+          id="send-message"
+          name="message"
+          className="textarea"
+          rows={8}
+          defaultValue={preview.message}
+          required
+        />
+        {preview.missing.length > 0 && (
+          <p className="error-text">Fill in: {preview.missing.map((m) => `{{${m}}}`).join(", ")}</p>
+        )}
       </div>
       <p className="text-sm text-muted">
         Attached: {preview.attachment} · includes a link to view online
       </p>
       <div className="flex gap-2 flex-wrap">
         {/* The primary action is the first submit button (Guide §7.2 rule 2) */}
-        <Submit name="kind" value={preview.kind} pendingText="Sending…" className="btn btn-primary btn-lg">
+        <Submit
+          name="kind"
+          value={preview.kind}
+          pendingText="Sending…"
+          className="btn btn-primary btn-lg"
+        >
           {label}
         </Submit>
         {preview.kind !== "reminder" && (
-          <button type="submit" name="kind" value="test" className="btn btn-secondary btn-lg" formNoValidate onClick={(e) => {
-            const f = e.currentTarget.form;
-            const k = f?.querySelector<HTMLInputElement>('input[name="idempotencyKey"]');
-            if (k) k.value = testKey;
-          }}>
+          <button
+            type="submit"
+            name="kind"
+            value="test"
+            className="btn btn-secondary btn-lg"
+            formNoValidate
+            onClick={(e) => {
+              const f = e.currentTarget.form;
+              const k = f?.querySelector<HTMLInputElement>('input[name="idempotencyKey"]');
+              if (k) k.value = testKey;
+            }}
+          >
             Send test to me
           </button>
         )}
@@ -112,8 +184,22 @@ export function SendForm({ invoiceId, clientId, preview, isFirst, changeSummary,
   );
 }
 
-export function PaymentForm({ invoiceId, currency, balanceMinor, today, refund }: { invoiceId: string; currency: string; balanceMinor: number; today: string; refund?: boolean }) {
-  const [amount, setAmount] = useState(minorToDecimalString(Math.max(0, refund ? 0 : balanceMinor), currency));
+export function PaymentForm({
+  invoiceId,
+  currency,
+  balanceMinor,
+  today,
+  refund,
+}: {
+  invoiceId: string;
+  currency: string;
+  balanceMinor: number;
+  today: string;
+  refund?: boolean;
+}) {
+  const [amount, setAmount] = useState(
+    minorToDecimalString(Math.max(0, refund ? 0 : balanceMinor), currency),
+  );
   const over = !refund && Number(amount) * 100 > balanceMinor && balanceMinor >= 0;
   return (
     <ActionForm action={recordPayment} closeDialog className="space-y-4">
@@ -136,8 +222,22 @@ export function PaymentForm({ invoiceId, currency, balanceMinor, today, refund }
         <label className="label" htmlFor="pay-amount">
           Amount ({currency})
         </label>
-        <input id="pay-amount" name="amount" className="input" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} required autoFocus />
-        {over && <p className="hint text-warning">More than the balance of {formatMoney({ minor: balanceMinor, currency })}. The invoice will show as overpaid.</p>}
+        <input
+          id="pay-amount"
+          name="amount"
+          className="input"
+          inputMode="decimal"
+          value={amount}
+          onChange={(e) => setAmount(e.target.value)}
+          required
+          autoFocus
+        />
+        {over && (
+          <p className="hint text-warning">
+            More than the balance of {formatMoney({ minor: balanceMinor, currency })}. The invoice
+            will show as overpaid.
+          </p>
+        )}
         <FieldError name="amount" />
       </div>
       <div className="grid grid-cols-2 gap-3">
@@ -145,7 +245,14 @@ export function PaymentForm({ invoiceId, currency, balanceMinor, today, refund }
           <label className="label" htmlFor="pay-date">
             Date
           </label>
-          <input id="pay-date" type="date" name="receivedOn" className="input" defaultValue={today} required />
+          <input
+            id="pay-date"
+            type="date"
+            name="receivedOn"
+            className="input"
+            defaultValue={today}
+            required
+          />
         </div>
         <div>
           <label className="label" htmlFor="pay-method">
@@ -176,19 +283,35 @@ export function PaymentForm({ invoiceId, currency, balanceMinor, today, refund }
   );
 }
 
-export function VoidForm({ invoiceId, number, entries }: { invoiceId: string; number: string; entries: number }) {
+export function VoidForm({
+  invoiceId,
+  number,
+  entries,
+}: {
+  invoiceId: string;
+  number: string;
+  entries: number;
+}) {
   return (
     <ActionForm action={voidInvoice} closeDialog className="space-y-4">
       <input type="hidden" name="invoiceId" value={invoiceId} />
       <p>
-        Void {number}? {entries > 0 ? `${entries} time entries go back to unbilled · ` : ""}the number stays in your sequence · the client's link will show "Void".
+        Void {number}? {entries > 0 ? `${entries} time entries go back to unbilled · ` : ""}the
+        number stays in your sequence · the client's link will show "Void".
       </p>
-      <p className="text-muted text-sm">To fix an invoice, correct it instead. Void is for invoices that shouldn't exist.</p>
+      <p className="text-muted text-sm">
+        To fix an invoice, correct it instead. Void is for invoices that shouldn't exist.
+      </p>
       <div>
         <label className="label" htmlFor="void-reason">
           Reason (optional)
         </label>
-        <input id="void-reason" name="reason" className="input" placeholder="Sent to the wrong client" />
+        <input
+          id="void-reason"
+          name="reason"
+          className="input"
+          placeholder="Sent to the wrong client"
+        />
       </div>
       <div className="flex gap-2">
         <Submit className="btn btn-danger" pendingText="Voiding…">

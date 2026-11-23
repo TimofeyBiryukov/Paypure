@@ -39,9 +39,23 @@ export interface BuilderEntry {
 }
 
 export interface BuilderData {
-  client: { id: string; name: string; colour: number; currency: string; termsDays: number; lineLayout: LineLayout };
+  client: {
+    id: string;
+    name: string;
+    colour: number;
+    currency: string;
+    termsDays: number;
+    lineLayout: LineLayout;
+  };
   entries: BuilderEntry[];
-  fixed: { taskId: string; taskName: string; projectName: string; feeMinor: number; remainingMinor: number; trackedSeconds: number }[];
+  fixed: {
+    taskId: string;
+    taskName: string;
+    projectName: string;
+    feeMinor: number;
+    remainingMinor: number;
+    trackedSeconds: number;
+  }[];
   liveTimer: { member: string; startedAt: string | null } | null;
   taxes: { id: string; name: string; rateBp: number }[];
   from: SheetData["from"];
@@ -65,17 +79,28 @@ export function Builder({ data, today }: { data: BuilderData; today: string }) {
   const [rangeFrom, setRangeFrom] = useState(available[0]?.date ?? today);
   const [fixedOn, setFixedOn] = useState<Record<string, boolean>>({});
   const [fixedAmt, setFixedAmt] = useState<Record<string, string>>(() =>
-    Object.fromEntries(data.fixed.map((f) => [f.taskId, minorToDecimalString(f.remainingMinor, cur)])),
+    Object.fromEntries(
+      data.fixed.map((f) => [f.taskId, minorToDecimalString(f.remainingMinor, cur)]),
+    ),
   );
   const [open, setOpen] = useState<Set<string>>(new Set());
 
   const inPeriod = (d: string) =>
-    period === "all" ? true : period === "today" ? d <= today : period === "upto" ? d <= upto : d >= rangeFrom && d <= upto;
+    period === "all"
+      ? true
+      : period === "today"
+        ? d <= today
+        : period === "upto"
+          ? d <= upto
+          : d >= rangeFrom && d <= upto;
   const visible = available.filter((e) => inPeriod(e.date));
   const chosen = visible.filter((e) => selected.has(e.id));
 
   const tree = useMemo(() => {
-    const projects = new Map<string, { name: string; tasks: Map<string, { name: string; entries: BuilderEntry[] }> }>();
+    const projects = new Map<
+      string,
+      { name: string; tasks: Map<string, { name: string; entries: BuilderEntry[] }> }
+    >();
     for (const e of data.entries.filter((x) => inPeriod(x.date))) {
       const p = projects.get(e.projectId) ?? { name: e.projectName, tasks: new Map() };
       const t = p.tasks.get(e.taskId) ?? { name: e.taskName, entries: [] };
@@ -90,20 +115,47 @@ export function Builder({ data, today }: { data: BuilderData; today: string }) {
   const fixedChosen = data.fixed
     .filter((f) => fixedOn[f.taskId])
     .map((f) => ({ f, amount: parseMoney(fixedAmt[f.taskId] ?? "", cur) }));
-  const fixedInvalid = fixedChosen.some(({ f, amount }) => !amount || amount <= 0 || amount > f.remainingMinor);
+  const fixedInvalid = fixedChosen.some(
+    ({ f, amount }) => !amount || amount <= 0 || amount > f.remainingMinor,
+  );
 
   const preview = useMemo(() => {
     const timeLines = buildTimeLines(
-      chosen.map((e) => ({ id: e.id, date: e.date, seconds: e.seconds, note: e.note, taskId: e.taskId, projectName: e.projectName, taskName: e.taskName, rateMinor: e.rateMinor })),
+      chosen.map((e) => ({
+        id: e.id,
+        date: e.date,
+        seconds: e.seconds,
+        note: e.note,
+        taskId: e.taskId,
+        projectName: e.projectName,
+        taskName: e.taskName,
+        rateMinor: e.rateMinor,
+      })),
       layout,
     );
     const fixedLines = fixedChosen
       .filter(({ amount }) => amount && amount > 0)
       .map(({ f, amount }) =>
-        buildFixedLine({ taskId: f.taskId, projectName: f.projectName, taskName: f.taskName, currency: cur, feeMinor: f.feeMinor, remainingMinor: f.remainingMinor, amountMinor: Math.min(amount as number, f.remainingMinor) }),
+        buildFixedLine({
+          taskId: f.taskId,
+          projectName: f.projectName,
+          taskName: f.taskName,
+          currency: cur,
+          feeMinor: f.feeMinor,
+          remainingMinor: f.remainingMinor,
+          amountMinor: Math.min(amount as number, f.remainingMinor),
+        }),
       );
     const taxIds = data.taxes.map((t) => t.id);
-    const lines: EditableLine[] = [...timeLines, ...fixedLines].map((l) => ({ kind: l.kind, title: l.title, detail: l.detail, qtyHundredths: l.qtyHundredths, unit: l.unit, rateMinor: l.rateMinor, taxIds }));
+    const lines: EditableLine[] = [...timeLines, ...fixedLines].map((l) => ({
+      kind: l.kind,
+      title: l.title,
+      detail: l.detail,
+      qtyHundredths: l.qtyHundredths,
+      unit: l.unit,
+      rateMinor: l.rateMinor,
+      taxIds,
+    }));
     const s = sheetFromLines(lines, data.taxes);
     const sheet: SheetData = {
       number: null,
@@ -154,32 +206,68 @@ export function Builder({ data, today }: { data: BuilderData; today: string }) {
         <input type="hidden" name="currency" value={cur} />
 
         {data.liveTimer && (
-          <div className="banner banner-warning text-sm">A timer is running on {data.client.name} ({data.liveTimer.member}). Stop it to include that time.</div>
+          <div className="banner banner-warning text-sm">
+            A timer is running on {data.client.name} ({data.liveTimer.member}). Stop it to include
+            that time.
+          </div>
         )}
 
         <fieldset>
           <legend className="label">Period</legend>
           <div className="flex flex-wrap gap-2 items-center">
-            <select className="select w-auto" value={period} onChange={(e) => setPeriod(e.target.value as Period)} aria-label="Period">
+            <select
+              className="select w-auto"
+              value={period}
+              onChange={(e) => setPeriod(e.target.value as Period)}
+              aria-label="Period"
+            >
               <option value="all">All unbilled</option>
               <option value="today">Up to today</option>
               <option value="upto">Up to…</option>
               <option value="range">Range…</option>
             </select>
-            {period === "range" && <input type="date" className="input w-auto" value={rangeFrom} onChange={(e) => setRangeFrom(e.target.value)} aria-label="From" />}
-            {(period === "upto" || period === "range") && <input type="date" className="input w-auto" value={upto} onChange={(e) => setUpto(e.target.value)} aria-label="Up to" />}
+            {period === "range" && (
+              <input
+                type="date"
+                className="input w-auto"
+                value={rangeFrom}
+                onChange={(e) => setRangeFrom(e.target.value)}
+                aria-label="From"
+              />
+            )}
+            {(period === "upto" || period === "range") && (
+              <input
+                type="date"
+                className="input w-auto"
+                value={upto}
+                onChange={(e) => setUpto(e.target.value)}
+                aria-label="Up to"
+              />
+            )}
           </div>
         </fieldset>
 
         <div className="max-h-[46vh] overflow-auto -mx-2 px-2">
           {[...tree.entries()].map(([pid, p]) => {
-            const pIds = [...p.tasks.values()].flatMap((t) => t.entries.filter((e) => !e.onDraft).map((e) => e.id));
-            const pSecs = [...p.tasks.values()].flatMap((t) => t.entries).filter((e) => selected.has(e.id) && !e.onDraft).reduce((s, e) => s + e.seconds, 0);
+            const pIds = [...p.tasks.values()].flatMap((t) =>
+              t.entries.filter((e) => !e.onDraft).map((e) => e.id),
+            );
+            const pSecs = [...p.tasks.values()]
+              .flatMap((t) => t.entries)
+              .filter((e) => selected.has(e.id) && !e.onDraft)
+              .reduce((s, e) => s + e.seconds, 0);
             const ps = state(pIds);
             return (
               <div key={pid} className="mb-3">
                 <label className="flex items-center gap-2 font-semibold py-1">
-                  <input type="checkbox" checked={ps === "all"} ref={(el) => { if (el) el.indeterminate = ps === "some"; }} onChange={(e) => toggle(pIds, e.target.checked)} />
+                  <input
+                    type="checkbox"
+                    checked={ps === "all"}
+                    ref={(el) => {
+                      if (el) el.indeterminate = ps === "some";
+                    }}
+                    onChange={(e) => toggle(pIds, e.target.checked)}
+                  />
                   <span className="flex-1">{p.name}</span>
                   <span className="tnum text-muted font-normal">{formatHoursMinutes(pSecs)}</span>
                 </label>
@@ -193,23 +281,69 @@ export function Builder({ data, today }: { data: BuilderData; today: string }) {
                   return (
                     <div key={tid} className="ml-5">
                       <div className="flex items-center gap-2 py-1">
-                        <input type="checkbox" aria-label={`Select ${t.name}`} checked={ts === "all"} ref={(el) => { if (el) el.indeterminate = ts === "some"; }} onChange={(e) => toggle(tIds, e.target.checked)} disabled={tIds.length === 0} />
+                        <input
+                          type="checkbox"
+                          aria-label={`Select ${t.name}`}
+                          checked={ts === "all"}
+                          ref={(el) => {
+                            if (el) el.indeterminate = ts === "some";
+                          }}
+                          onChange={(e) => toggle(tIds, e.target.checked)}
+                          disabled={tIds.length === 0}
+                        />
                         <span className="flex-1 truncate">{t.name}</span>
                         <span className="tnum text-muted">{formatHoursMinutes(tSecs)}</span>
                         <span className="tnum w-20 text-right">
-                          {rate == null ? <span className="text-warning">No rate</span> : formatMoney({ minor: lineAmount(secondsToHundredths(tSecs), rate), currency: cur })}
+                          {rate == null ? (
+                            <span className="text-warning">No rate</span>
+                          ) : (
+                            formatMoney({
+                              minor: lineAmount(secondsToHundredths(tSecs), rate),
+                              currency: cur,
+                            })
+                          )}
                         </span>
-                        <button type="button" className="btn btn-ghost btn-sm px-1" aria-expanded={expanded} aria-label={`Show ${t.entries.length} entries`} onClick={() => setOpen((o) => { const n = new Set(o); expanded ? n.delete(tid) : n.add(tid); return n; })}>
-                          <ChevronRight size={14} className={expanded ? "rotate-90" : ""} /> {t.entries.length}
+                        <button
+                          type="button"
+                          className="btn btn-ghost btn-sm px-1"
+                          aria-expanded={expanded}
+                          aria-label={`Show ${t.entries.length} entries`}
+                          onClick={() =>
+                            setOpen((o) => {
+                              const n = new Set(o);
+                              expanded ? n.delete(tid) : n.add(tid);
+                              return n;
+                            })
+                          }
+                        >
+                          <ChevronRight size={14} className={expanded ? "rotate-90" : ""} />{" "}
+                          {t.entries.length}
                         </button>
                       </div>
                       {/* Each entry is a real checkbox in the form (named entryIds), even when collapsed */}
                       <ul className={expanded ? "ml-6 mb-2" : "hidden"}>
                         {t.entries.map((e) => (
                           <li key={e.id} className="flex items-start gap-2 py-0.5 text-[13px]">
-                            <input type="checkbox" name="entryIds" value={e.id} checked={!e.onDraft && selected.has(e.id)} disabled={!!e.onDraft} onChange={(ev) => toggle([e.id], ev.target.checked)} aria-label={`${formatDateShort(e.date)} ${e.note}`} className="mt-1" />
-                            <span className="w-24 shrink-0 text-muted">{formatDateShort(e.date)}</span>
-                            <span className="flex-1 truncate">{e.onDraft ? <span className="text-muted">{e.onDraft.label}</span> : e.note.split("\n")[0] || <span className="text-faint">No note</span>}</span>
+                            <input
+                              type="checkbox"
+                              name="entryIds"
+                              value={e.id}
+                              checked={!e.onDraft && selected.has(e.id)}
+                              disabled={!!e.onDraft}
+                              onChange={(ev) => toggle([e.id], ev.target.checked)}
+                              aria-label={`${formatDateShort(e.date)} ${e.note}`}
+                              className="mt-1"
+                            />
+                            <span className="w-24 shrink-0 text-muted">
+                              {formatDateShort(e.date)}
+                            </span>
+                            <span className="flex-1 truncate">
+                              {e.onDraft ? (
+                                <span className="text-muted">{e.onDraft.label}</span>
+                              ) : (
+                                e.note.split("\n")[0] || <span className="text-faint">No note</span>
+                              )}
+                            </span>
                             <span className="tnum">{formatHoursMinutes(e.seconds)}</span>
                           </li>
                         ))}
@@ -223,17 +357,35 @@ export function Builder({ data, today }: { data: BuilderData; today: string }) {
           {data.fixed.map((f) => (
             <div key={f.taskId} className="py-2 border-t border-line">
               <label className="flex items-center gap-2">
-                <input type="checkbox" name="fixedTaskIds" value={f.taskId} checked={!!fixedOn[f.taskId]} onChange={(e) => setFixedOn((o) => ({ ...o, [f.taskId]: e.target.checked }))} />
+                <input
+                  type="checkbox"
+                  name="fixedTaskIds"
+                  value={f.taskId}
+                  checked={!!fixedOn[f.taskId]}
+                  onChange={(e) => setFixedOn((o) => ({ ...o, [f.taskId]: e.target.checked }))}
+                />
                 <span className="flex-1">
                   {f.projectName} · {f.taskName} <span className="t-caption">(fixed fee)</span>
                 </span>
               </label>
               <div className="ml-6 flex items-center gap-2 mt-1 text-sm">
                 <label htmlFor={`fixed_${f.taskId}`}>Bill</label>
-                <input id={`fixed_${f.taskId}`} name={`fixed_${f.taskId}`} className="input w-28" value={fixedAmt[f.taskId]} onChange={(e) => setFixedAmt((a) => ({ ...a, [f.taskId]: e.target.value }))} inputMode="decimal" disabled={!fixedOn[f.taskId]} />
-                <span className="text-muted">of {formatMoney({ minor: f.remainingMinor, currency: cur })} remaining</span>
+                <input
+                  id={`fixed_${f.taskId}`}
+                  name={`fixed_${f.taskId}`}
+                  className="input w-28"
+                  value={fixedAmt[f.taskId]}
+                  onChange={(e) => setFixedAmt((a) => ({ ...a, [f.taskId]: e.target.value }))}
+                  inputMode="decimal"
+                  disabled={!fixedOn[f.taskId]}
+                />
+                <span className="text-muted">
+                  of {formatMoney({ minor: f.remainingMinor, currency: cur })} remaining
+                </span>
               </div>
-              <p className="ml-6 t-caption">{formatHoursMinutes(f.trackedSeconds)} tracked · covered by the fee</p>
+              <p className="ml-6 t-caption">
+                {formatHoursMinutes(f.trackedSeconds)} tracked · covered by the fee
+              </p>
               <FieldError name={`fixed_${f.taskId}`} />
             </div>
           ))}
@@ -250,7 +402,13 @@ export function Builder({ data, today }: { data: BuilderData; today: string }) {
               ] as const
             ).map(([v, l]) => (
               <label key={v} className="flex items-center gap-2">
-                <input type="radio" name="mode" value={v} checked={layout.mode === v} onChange={() => setLayout((x) => ({ ...x, mode: v }))} />
+                <input
+                  type="radio"
+                  name="mode"
+                  value={v}
+                  checked={layout.mode === v}
+                  onChange={() => setLayout((x) => ({ ...x, mode: v }))}
+                />
                 {l}
               </label>
             ))}
@@ -259,21 +417,37 @@ export function Builder({ data, today }: { data: BuilderData; today: string }) {
         <fieldset className="flex gap-4">
           <legend className="label">Show on lines</legend>
           <label className="flex items-center gap-2">
-            <input type="checkbox" name="showDates" checked={layout.showDates} onChange={(e) => setLayout((x) => ({ ...x, showDates: e.target.checked }))} /> dates
+            <input
+              type="checkbox"
+              name="showDates"
+              checked={layout.showDates}
+              onChange={(e) => setLayout((x) => ({ ...x, showDates: e.target.checked }))}
+            />{" "}
+            dates
           </label>
           <label className="flex items-center gap-2">
-            <input type="checkbox" name="showNotes" checked={layout.showNotes} onChange={(e) => setLayout((x) => ({ ...x, showNotes: e.target.checked }))} /> entry notes
+            <input
+              type="checkbox"
+              name="showNotes"
+              checked={layout.showNotes}
+              onChange={(e) => setLayout((x) => ({ ...x, showNotes: e.target.checked }))}
+            />{" "}
+            entry notes
           </label>
         </fieldset>
 
         <div className="border-t border-line pt-4 space-y-3">
           <p className="tnum">
-            {chosen.length} {chosen.length === 1 ? "entry" : "entries"} · {formatHoursMinutes(secs)} · <b>{formatMoney({ minor: preview.sheet.subtotalMinor, currency: cur })}</b>
-            {data.taxes.length > 0 && <span className="text-muted"> + {data.taxes.map((t) => t.name).join(", ")}</span>}
+            {chosen.length} {chosen.length === 1 ? "entry" : "entries"} · {formatHoursMinutes(secs)}{" "}
+            · <b>{formatMoney({ minor: preview.sheet.subtotalMinor, currency: cur })}</b>
+            {data.taxes.length > 0 && (
+              <span className="text-muted"> + {data.taxes.map((t) => t.name).join(", ")}</span>
+            )}
           </p>
           {noRate.length > 0 && (
             <p className="banner banner-warning text-sm">
-              Set a rate for {data.client.name} to bill {formatHoursMinutes(noRate.reduce((s, e) => s + e.seconds, 0))}.{" "}
+              Set a rate for {data.client.name} to bill{" "}
+              {formatHoursMinutes(noRate.reduce((s, e) => s + e.seconds, 0))}.{" "}
               <Link href={`/clients/${data.client.id}?tab=details`} className="underline">
                 Set a rate
               </Link>
@@ -283,11 +457,20 @@ export function Builder({ data, today }: { data: BuilderData; today: string }) {
             pendingText="Creating draft…"
             className="btn btn-primary w-full btn-lg"
             disabled={noRate.length > 0 || fixedInvalid || preview.lineCount === 0}
-            title={noRate.length > 0 ? "Some selected time has no rate" : preview.lineCount === 0 ? "Select some work to bill" : undefined}
+            title={
+              noRate.length > 0
+                ? "Some selected time has no rate"
+                : preview.lineCount === 0
+                  ? "Select some work to bill"
+                  : undefined
+            }
           >
             Create draft
           </Submit>
-          <p className="t-caption">The entries are reserved for this invoice as soon as the draft exists, so they can't be invoiced twice.</p>
+          <p className="t-caption">
+            The entries are reserved for this invoice as soon as the draft exists, so they can't be
+            invoiced twice.
+          </p>
         </div>
       </ActionForm>
 

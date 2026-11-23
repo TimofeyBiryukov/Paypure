@@ -1,15 +1,28 @@
 "use server";
 
-import { addDays, formatDuration, fromWallTime, isValidTimeZone, parseDuration, parseTimeOfDay } from "@paypure/domain";
+import {
+  addDays,
+  formatDuration,
+  fromWallTime,
+  isValidTimeZone,
+  parseDuration,
+  parseTimeOfDay,
+} from "@paypure/domain";
 import { revalidatePath } from "next/cache";
 import { type ActionState, bool, run, str } from "@/lib/action";
-import { api, ApiError, displayTz } from "@/server/api";
+import { ApiError, api, displayTz } from "@/server/api";
 
 function wall(date: string, input: string, tz: string, field: string) {
   const hhmm = parseTimeOfDay(input);
-  if (!hhmm) throw new ApiError(422, "invalid", "Check the times.", { [field]: "Use a time like 9, 930 or 9:30p" });
+  if (!hhmm)
+    throw new ApiError(422, "invalid", "Check the times.", {
+      [field]: "Use a time like 9, 930 or 9:30p",
+    });
   const r = fromWallTime(date, hhmm, tz);
-  if (!r.ok) throw new ApiError(422, "invalid", "That time doesn't exist on this date.", { [field]: `${hhmm} doesn't exist (clocks go forward) → ${r.suggestion}?` });
+  if (!r.ok)
+    throw new ApiError(422, "invalid", "That time doesn't exist on this date.", {
+      [field]: `${hhmm} doesn't exist (clocks go forward) → ${r.suggestion}?`,
+    });
   return r.instant;
 }
 
@@ -17,7 +30,10 @@ function wall(date: string, input: string, tz: string, field: string) {
 export async function saveEntry(_: ActionState, fd: FormData): Promise<ActionState> {
   return run(async () => {
     const id = str(fd, "id");
-    const tz = str(fd, "entryTz") && isValidTimeZone(str(fd, "entryTz")) ? str(fd, "entryTz") : ((await displayTz()) ?? "UTC");
+    const tz =
+      str(fd, "entryTz") && isValidTimeZone(str(fd, "entryTz"))
+        ? str(fd, "entryTz")
+        : ((await displayTz()) ?? "UTC");
     const date = str(fd, "date");
     const mode = str(fd, "mode");
     const body: Record<string, unknown> = {
@@ -29,10 +45,14 @@ export async function saveEntry(_: ActionState, fd: FormData): Promise<ActionSta
       version: str(fd, "version") ? Number(str(fd, "version")) : undefined,
       memberId: str(fd, "memberId") || undefined,
     };
-    if (!body.taskId) throw new ApiError(422, "invalid", "Choose a task.", { taskId: "Choose a task" });
+    if (!body.taskId)
+      throw new ApiError(422, "invalid", "Choose a task.", { taskId: "Choose a task" });
     if (mode === "duration") {
       const secs = parseDuration(str(fd, "duration"));
-      if (!secs) throw new ApiError(422, "invalid", "Check the duration.", { duration: "Use 1.5, 1h30, 90m or 1:30" });
+      if (!secs)
+        throw new ApiError(422, "invalid", "Check the duration.", {
+          duration: "Use 1.5, 1h30, 90m or 1:30",
+        });
       body.durationSeconds = secs;
     } else {
       const segCount = Number(str(fd, "segCount") || "0");
@@ -65,17 +85,38 @@ export async function saveEntry(_: ActionState, fd: FormData): Promise<ActionSta
       body.segments = segments;
     }
     if (id) {
-      const r = await api<{ staged?: boolean; invoiceNumber?: string; invoiceId?: string; onDraft?: boolean }>(`/v1/time-entries/${id}`, { method: "PATCH", body });
+      const r = await api<{
+        staged?: boolean;
+        invoiceNumber?: string;
+        invoiceId?: string;
+        onDraft?: boolean;
+      }>(`/v1/time-entries/${id}`, { method: "PATCH", body });
       revalidatePath("/", "layout");
       if (r.staged) {
-        return { toast: { text: `Change added to the correction for ${r.invoiceNumber}`, link: { href: `/invoices/${r.invoiceId}`, label: "Review" } } };
+        return {
+          toast: {
+            text: `Change added to the correction for ${r.invoiceNumber}`,
+            link: { href: `/invoices/${r.invoiceId}`, label: "Review" },
+          },
+        };
       }
       return { toast: { text: r.onDraft ? "Saved. The draft's lines are out of date." : "Saved" } };
     }
     const r = await api<{ id: string }>("/v1/time-entries", { body });
     revalidatePath("/", "layout");
-    const secs = (body.durationSeconds as number | undefined) ?? (body.segments as { startedAt: string; endedAt: string }[]).reduce((a, s) => a + (Date.parse(s.endedAt) - Date.parse(s.startedAt)) / 1000, 0);
-    return { data: { id: r.id }, toast: { text: `Logged ${formatDuration(secs)}`, undo: { action: "restoreEntry", payload: { id: r.id } } } };
+    const secs =
+      (body.durationSeconds as number | undefined) ??
+      (body.segments as { startedAt: string; endedAt: string }[]).reduce(
+        (a, s) => a + (Date.parse(s.endedAt) - Date.parse(s.startedAt)) / 1000,
+        0,
+      );
+    return {
+      data: { id: r.id },
+      toast: {
+        text: `Logged ${formatDuration(secs)}`,
+        undo: { action: "restoreEntry", payload: { id: r.id } },
+      },
+    };
   });
 }
 
@@ -84,7 +125,9 @@ export async function deleteEntry(_: ActionState, fd: FormData): Promise<ActionS
     const id = str(fd, "id");
     await api(`/v1/time-entries/${id}`, { method: "DELETE" });
     revalidatePath("/", "layout");
-    return { toast: { text: "Time entry deleted", undo: { action: "restoreEntry", payload: { id } } } };
+    return {
+      toast: { text: "Time entry deleted", undo: { action: "restoreEntry", payload: { id } } },
+    };
   });
 }
 
@@ -103,18 +146,33 @@ export async function bulkTime(_: ActionState, fd: FormData): Promise<ActionStat
     if (ids.length === 0) throw new ApiError(422, "invalid", "Select some entries first.");
     const op = str(fd, "op");
     if (op === "written_off" || op === "billed_elsewhere") {
-      const r = await api<{ count: number }>("/v1/time-entries/off-invoice", { body: { entryIds: ids, kind: op, ref: str(fd, "ref") || undefined } });
+      const r = await api<{ count: number }>("/v1/time-entries/off-invoice", {
+        body: { entryIds: ids, kind: op, ref: str(fd, "ref") || undefined },
+      });
       revalidatePath("/", "layout");
-      return { toast: { text: `${r.count} ${r.count === 1 ? "entry" : "entries"} ${op === "written_off" ? "written off" : "marked billed elsewhere"}`, undo: { action: "restoreUnbilled", payload: { ids: ids.join(",") } } } };
+      return {
+        toast: {
+          text: `${r.count} ${r.count === 1 ? "entry" : "entries"} ${op === "written_off" ? "written off" : "marked billed elsewhere"}`,
+          undo: { action: "restoreUnbilled", payload: { ids: ids.join(",") } },
+        },
+      };
     }
     if (op === "restore_unbilled") {
-      const r = await api<{ count: number }>("/v1/time-entries/off-invoice", { body: { entryIds: ids, kind: null } });
+      const r = await api<{ count: number }>("/v1/time-entries/off-invoice", {
+        body: { entryIds: ids, kind: null },
+      });
       revalidatePath("/", "layout");
       return { toast: { text: `${r.count} restored to unbilled` } };
     }
     const action = op === "move" ? "move" : op;
-    const r = await api<{ count: number; skipped: number }>("/v1/time-entries/bulk", { body: { entryIds: ids, action, taskId: str(fd, "taskId") || undefined } });
+    const r = await api<{ count: number; skipped: number }>("/v1/time-entries/bulk", {
+      body: { entryIds: ids, action, taskId: str(fd, "taskId") || undefined },
+    });
     revalidatePath("/", "layout");
-    return { toast: { text: `${r.count} updated${r.skipped ? ` · ${r.skipped} skipped (billed or running)` : ""}` } };
+    return {
+      toast: {
+        text: `${r.count} updated${r.skipped ? ` · ${r.skipped} skipped (billed or running)` : ""}`,
+      },
+    };
   });
 }

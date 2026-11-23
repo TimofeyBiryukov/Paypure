@@ -1,4 +1,10 @@
-import { type ArgumentsHost, Catch, type ExceptionFilter, HttpException, Logger } from "@nestjs/common";
+import {
+  type ArgumentsHost,
+  Catch,
+  type ExceptionFilter,
+  HttpException,
+  Logger,
+} from "@nestjs/common";
 import type { FastifyReply } from "fastify";
 import { Prisma } from "../generated/prisma/client";
 
@@ -18,7 +24,10 @@ export class AllExceptionsFilter implements ExceptionFilter {
     }
     const msg = String((exception as Error)?.message ?? exception);
     if (exception instanceof Prisma.PrismaClientKnownRequestError && exception.code === "P2002") {
-      reply.status(409).send({ code: "conflict", message: "That already exists or was changed at the same time." });
+      reply.status(409).send({
+        code: "conflict",
+        message: "That already exists or was changed at the same time.",
+      });
       return;
     }
     if (msg.includes("invalid input syntax for type uuid")) {
@@ -26,7 +35,9 @@ export class AllExceptionsFilter implements ExceptionFilter {
       return;
     }
     // Raised by our triggers and check constraints (08 §3.3): a rule held at the database level.
-    const rule = msg.match(/(?:frozen|write-once|billed|status can't|only draft|fixed once|propose a correction|violates check constraint "([a-z_]+)"|one_live_timer)[^\n]*/);
+    const rule = msg.match(
+      /(?:frozen|write-once|billed|status can't|only draft|fixed once|propose a correction|violates check constraint "([a-z_]+)"|one_live_timer)[^\n]*/,
+    );
     if (rule) {
       reply.status(409).send({ code: "rule", message: rule[0] });
       return;

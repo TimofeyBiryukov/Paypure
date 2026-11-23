@@ -38,7 +38,11 @@ export interface TaskUnbilled {
 export class BillingService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async fixedBilled(db: Tx | PrismaService, wsId: string, excludeInvoiceId?: string): Promise<Map<string, number>> {
+  async fixedBilled(
+    db: Tx | PrismaService,
+    wsId: string,
+    excludeInvoiceId?: string,
+  ): Promise<Map<string, number>> {
     const rows = await db.$queryRaw<{ task_id: string; billed: number }[]>`
       WITH per AS (
         SELECT l.task_id, i.id AS inv,
@@ -119,11 +123,17 @@ export class BillingService {
         rateMinor: resolved?.rateMinor ?? null,
         rateSource: resolved?.source ?? null,
         hourlyMinor:
-          resolved && r.seconds > 0 ? lineAmount(secondsToHundredths(r.seconds), resolved.rateMinor) : r.seconds > 0 ? null : 0,
+          resolved && r.seconds > 0
+            ? lineAmount(secondsToHundredths(r.seconds), resolved.rateMinor)
+            : r.seconds > 0
+              ? null
+              : 0,
         feeMinor: r.fixed_amount_minor,
         fixedBilledMinor: billed,
         fixedRemainingMinor:
-          r.billing_mode === "fixed" && r.fixed_amount_minor ? unbilledFixed(r.fixed_amount_minor, billed) : 0,
+          r.billing_mode === "fixed" && r.fixed_amount_minor
+            ? unbilledFixed(r.fixed_amount_minor, billed)
+            : 0,
         taskCreated: d2s(r.task_created) ?? "",
       };
     });
@@ -133,7 +143,14 @@ export class BillingService {
   rollupByClient(tasks: TaskUnbilled[]) {
     const map = new Map<
       string,
-      { clientId: string; currency: string; seconds: number; amountMinor: number; noRateSeconds: number; since: string | null }
+      {
+        clientId: string;
+        currency: string;
+        seconds: number;
+        amountMinor: number;
+        noRateSeconds: number;
+        since: string | null;
+      }
     >();
     for (const t of tasks) {
       const amount = (t.hourlyMinor ?? 0) + t.fixedRemainingMinor;
@@ -163,8 +180,14 @@ export class BillingService {
       include: {
         client: { select: { id: true, name: true, colour: true } },
         currentVersion: { select: { rev: true, issueDate: true, dueDate: true, total: true } },
-        versions: { where: { frozenAt: null }, select: { id: true, rev: true, total: true, dueDate: true } },
-        payments: { where: { deletedAt: null }, select: { kind: true, amount: true, receivedOn: true } },
+        versions: {
+          where: { frozenAt: null },
+          select: { id: true, rev: true, total: true, dueDate: true },
+        },
+        payments: {
+          where: { deletedAt: null },
+          select: { kind: true, amount: true, receivedOn: true },
+        },
         activity: { where: { kind: "viewed" }, select: { id: true }, take: 1 },
       },
       orderBy: [{ createdAt: "desc" }],
@@ -174,7 +197,10 @@ export class BillingService {
       const open = i.versions[0];
       const cur = i.currentVersion;
       const totalMinor = (i.status === "draft" ? open?.total : cur?.total) ?? 0;
-      const netPaidMinor = i.payments.reduce((s, p) => s + (p.kind === "payment" ? p.amount : -p.amount), 0);
+      const netPaidMinor = i.payments.reduce(
+        (s, p) => s + (p.kind === "payment" ? p.amount : -p.amount),
+        0,
+      );
       const dueDate = d2s(i.status === "draft" ? open?.dueDate : cur?.dueDate);
       const st = displayStatus({ status: i.status, totalMinor, netPaidMinor, dueDate, today });
       const lastPaid = i.payments.reduce<string | null>((m, p) => {

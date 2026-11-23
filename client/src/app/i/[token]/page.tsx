@@ -5,7 +5,11 @@ import { InvoiceSheet } from "@/components/sheet";
 import { api, getMe } from "@/server/api";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "Invoice", robots: { index: false, follow: false }, referrer: "no-referrer" as const };
+export const metadata = {
+  title: "Invoice",
+  robots: { index: false, follow: false },
+  referrer: "no-referrer" as const,
+};
 
 interface PublicInvoice {
   sheet: SheetData;
@@ -17,11 +21,17 @@ interface PublicInvoice {
 }
 
 /** S15: the client sees the invoice and how to pay it, with no login. Mobile-first. */
-export default async function PublicInvoicePage({ params }: { params: Promise<{ token: string }> }) {
+export default async function PublicInvoicePage({
+  params,
+}: {
+  params: Promise<{ token: string }>;
+}) {
   const { token } = await params;
   let data: PublicInvoice;
   try {
-    data = await api<PublicInvoice>(`/v1/public/invoices/${encodeURIComponent(token)}`, { token: null });
+    data = await api<PublicInvoice>(`/v1/public/invoices/${encodeURIComponent(token)}`, {
+      token: null,
+    });
   } catch {
     notFound();
   }
@@ -107,7 +117,10 @@ export default async function PublicInvoicePage({ params }: { params: Promise<{ 
                 <tr key={i}>
                   <td>{formatDateLong(p.receivedOn)}</td>
                   <td>{p.kind === "refund" ? "Refund" : "Payment received"}</td>
-                  <td className="num">{p.kind === "refund" ? "−" : ""}{m(p.amountMinor)}</td>
+                  <td className="num">
+                    {p.kind === "refund" ? "−" : ""}
+                    {m(p.amountMinor)}
+                  </td>
                 </tr>
               ))}
               <tr>

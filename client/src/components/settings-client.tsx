@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useFormState } from "./toaster";
 import { CopyButton } from "./public-ready";
+import { useFormState } from "./toaster";
 
 export function SettingsNav({ isAdmin }: { isAdmin: boolean }) {
   const path = usePathname();

@@ -1,4 +1,13 @@
-import { Controller, Get, Injectable, Logger, type OnModuleDestroy, type OnModuleInit, Req, Res } from "@nestjs/common";
+import {
+  Controller,
+  Get,
+  Injectable,
+  Logger,
+  type OnModuleDestroy,
+  type OnModuleInit,
+  Req,
+  Res,
+} from "@nestjs/common";
 import type { FastifyReply, FastifyRequest } from "fastify";
 import { Client as PgClient } from "pg";
 import { C, type Ctx } from "../common/auth";

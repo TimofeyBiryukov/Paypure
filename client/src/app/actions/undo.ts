@@ -23,14 +23,18 @@ export async function restoreTimer(_: ActionState, fd: FormData): Promise<Action
 
 export async function restorePayment(_: ActionState, fd: FormData): Promise<ActionState> {
   return run(async () => {
-    await api(`/v1/invoices/${str(fd, "invoiceId")}/payments/${str(fd, "id")}/restore`, { body: {} });
+    await api(`/v1/invoices/${str(fd, "invoiceId")}/payments/${str(fd, "id")}/restore`, {
+      body: {},
+    });
     revalidatePath("/", "layout");
   });
 }
 
 export async function restoreUnbilled(_: ActionState, fd: FormData): Promise<ActionState> {
   return run(async () => {
-    await api("/v1/time-entries/off-invoice", { body: { entryIds: str(fd, "ids").split(","), kind: null } });
+    await api("/v1/time-entries/off-invoice", {
+      body: { entryIds: str(fd, "ids").split(","), kind: null },
+    });
     revalidatePath("/", "layout");
   });
 }
@@ -48,4 +52,3 @@ export async function undoneTask(_: ActionState, fd: FormData): Promise<ActionSt
     revalidatePath("/", "layout");
   });
 }
-

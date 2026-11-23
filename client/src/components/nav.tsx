@@ -13,7 +13,10 @@ export function NavLinks({ isAdmin, variant }: { isAdmin: boolean; variant: "top
     { href: "/clients", label: "Clients", icon: Users },
     ...(isAdmin ? [{ href: "/invoices", label: "Invoices", icon: FileText }] : []),
   ];
-  const current = (href: string) => (href === "/" ? path === "/" : path.startsWith(href) || (href === "/clients" && path.startsWith("/projects")));
+  const current = (href: string) =>
+    href === "/"
+      ? path === "/"
+      : path.startsWith(href) || (href === "/clients" && path.startsWith("/projects"));
   if (variant === "top") {
     return (
       <nav className="hidden sm:flex items-center gap-1" aria-label="Main">
@@ -31,9 +34,18 @@ export function NavLinks({ isAdmin, variant }: { isAdmin: boolean; variant: "top
     );
   }
   return (
-    <nav className="sm:hidden fixed bottom-0 inset-x-0 z-30 bg-surface border-t border-line grid" style={{ gridTemplateColumns: `repeat(${items.length}, 1fr)` }} aria-label="Main">
+    <nav
+      className="sm:hidden fixed bottom-0 inset-x-0 z-30 bg-surface border-t border-line grid"
+      style={{ gridTemplateColumns: `repeat(${items.length}, 1fr)` }}
+      aria-label="Main"
+    >
       {items.map((i) => (
-        <Link key={i.href} href={i.href} aria-current={current(i.href) ? "page" : undefined} className={`flex flex-col items-center justify-center h-14 gap-0.5 text-[11px] font-medium ${current(i.href) ? "text-accent" : "text-muted"}`}>
+        <Link
+          key={i.href}
+          href={i.href}
+          aria-current={current(i.href) ? "page" : undefined}
+          className={`flex flex-col items-center justify-center h-14 gap-0.5 text-[11px] font-medium ${current(i.href) ? "text-accent" : "text-muted"}`}
+        >
           <i.icon size={18} aria-hidden />
           {i.label}
         </Link>

@@ -28,12 +28,12 @@ docker compose exec api pnpm exec biome lint client/src api/src
 
 ## Layout (Tech §3)
 
-| Path | What |
-|---|---|
-| `packages/domain` | `@paypure/domain`: money (integer minor units, half-away rounding), currency table, rate resolution, line building and totals, `displayStatus()`, numbering, time zones, zod schemas. Tests cover every worked example in 07 §9 |
-| `api` | NestJS 11 on Fastify, Prisma 7 + Postgres 18. Modules: auth (argon2id, opaque DB sessions), catalog, time + timer, invoices (builder, drafts, send transaction, corrections, void, duplicate, payments), public/print, settings, live-sync events (pg_notify → LISTEN → SSE), outbox worker, PDF via Gotenberg |
+| Path                    | What                                                                                                                                                                                                                                                                                                                        |
+| ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `packages/domain`       | `@paypure/domain`: money (integer minor units, half-away rounding), currency table, rate resolution, line building and totals, `displayStatus()`, numbering, time zones, zod schemas. Tests cover every worked example in 07 §9                                                                                             |
+| `api`                   | NestJS 11 on Fastify, Prisma 7 + Postgres 18. Modules: auth (argon2id, opaque DB sessions), catalog, time + timer, invoices (builder, drafts, send transaction, corrections, void, duplicate, payments), public/print, settings, live-sync events (pg_notify → LISTEN → SSE), outbox worker, PDF via Gotenberg              |
 | `api/prisma/migrations` | Schema plus the rules Prisma can't express: one live timer per member, non-overlapping segments (btree_gist), fixed-fee and payment-account checks, line-maths check, and the immutability triggers (frozen versions, write-once PDFs and activity, billed-time guard). The app connects as `paypure_app`, a non-owner role |
-| `client` | Next.js 16 BFF: the browser only talks to Next; server components and Server Actions call the API. Every data commit is a real `<form>` (Guide §7) |
+| `client`                | Next.js 16 BFF: the browser only talks to Next; server components and Server Actions call the API. Every data commit is a real `<form>` (Guide §7)                                                                                                                                                                          |
 
 ## What works
 

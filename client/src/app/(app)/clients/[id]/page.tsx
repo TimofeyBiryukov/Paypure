@@ -1,4 +1,10 @@
-import { type ChipTone, formatDateLong, formatHoursMinutes, formatMoney, minorToDecimalString } from "@paypure/domain";
+import {
+  type ChipTone,
+  formatDateLong,
+  formatHoursMinutes,
+  formatMoney,
+  minorToDecimalString,
+} from "@paypure/domain";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
@@ -12,8 +18,18 @@ import {
 import { ColourPicker, CurrencySelect, Field, moneyValue } from "@/components/catalog-fields";
 import { Submit } from "@/components/submit";
 import { ActionForm } from "@/components/toaster";
-import { ClientBadge, Empty, Money, PageHeader, Progress, Stat, StatStrip, StatusChip, Tabs } from "@/components/ui";
-import { api, ApiError, getMe } from "@/server/api";
+import {
+  ClientBadge,
+  Empty,
+  Money,
+  PageHeader,
+  Progress,
+  Stat,
+  StatStrip,
+  StatusChip,
+  Tabs,
+} from "@/components/ui";
+import { ApiError, api, getMe } from "@/server/api";
 
 interface Project {
   id: string;
@@ -98,9 +114,12 @@ export default async function ClientPage({
     throw e;
   }
   const tabs = me.isAdmin ? TABS : (["overview", "projects"] as const);
-  const tab = (tabs as readonly string[]).includes(tabQ ?? "") ? (tabQ as (typeof TABS)[number]) : "overview";
+  const tab = (tabs as readonly string[]).includes(tabQ ?? "")
+    ? (tabQ as (typeof TABS)[number])
+    : "overview";
   const m = (minor: number) => ({ minor, currency: c.currency });
-  const nothingUnbilled = (c.stats?.unbilledMinor ?? 0) === 0 && (c.stats?.unbilledSeconds ?? 0) === 0;
+  const nothingUnbilled =
+    (c.stats?.unbilledMinor ?? 0) === 0 && (c.stats?.unbilledSeconds ?? 0) === 0;
   const active = c.projects.filter((p) => p.status === "active");
 
   return (
@@ -125,7 +144,10 @@ export default async function ClientPage({
                   <Link href={`/clients/${c.id}?tab=details`} className="menu-item">
                     Edit
                   </Link>
-                  <ActionForm action={c.archivedAt ? restoreClient : archiveClient} showError={false}>
+                  <ActionForm
+                    action={c.archivedAt ? restoreClient : archiveClient}
+                    showError={false}
+                  >
                     <input type="hidden" name="id" value={c.id} />
                     <button type="submit" className="menu-item">
                       {c.archivedAt ? "Restore" : "Archive"}
@@ -138,7 +160,8 @@ export default async function ClientPage({
                       <ActionForm action={deleteClient} className="p-2 max-w-[260px] space-y-2">
                         <input type="hidden" name="id" value={c.id} />
                         <p className="text-[13px]">
-                          Delete {c.name}? Its {c.projects.length} projects, their tasks and time entries go too. This can't be undone.
+                          Delete {c.name}? Its {c.projects.length} projects, their tasks and time
+                          entries go too. This can't be undone.
                         </p>
                         <Submit className="btn btn-danger btn-sm w-full" pendingText="Deleting…">
                           Delete client
@@ -146,17 +169,27 @@ export default async function ClientPage({
                       </ActionForm>
                     </details>
                   ) : (
-                    <span className="menu-item text-faint cursor-not-allowed" title="Clients with sent invoices are kept for your records.">
+                    <span
+                      className="menu-item text-faint cursor-not-allowed"
+                      title="Clients with sent invoices are kept for your records."
+                    >
                       Delete (has sent invoices)
                     </span>
                   )}
                 </div>
               </details>
-              <Link href={`/clients/${c.id}?tab=projects#new-project`} className="btn btn-secondary">
+              <Link
+                href={`/clients/${c.id}?tab=projects#new-project`}
+                className="btn btn-secondary"
+              >
                 New project
               </Link>
               {nothingUnbilled ? (
-                <span className="btn btn-primary" aria-disabled="true" title={`${c.name} has no unbilled time.`}>
+                <span
+                  className="btn btn-primary"
+                  aria-disabled="true"
+                  title={`${c.name} has no unbilled time.`}
+                >
                   Create invoice
                 </span>
               ) : (
@@ -180,10 +213,16 @@ export default async function ClientPage({
         <div className="space-y-6">
           {c.stats && (
             <StatStrip>
-              <Stat label="Unbilled" href={nothingUnbilled ? undefined : `/invoices/new?client=${c.id}`}>
+              <Stat
+                label="Unbilled"
+                href={nothingUnbilled ? undefined : `/invoices/new?client=${c.id}`}
+              >
                 <Money m={m(c.stats.unbilledMinor)} />
                 {c.stats.noRateSeconds > 0 && (
-                  <Link href={`/clients/${c.id}?tab=details`} className="block t-caption text-warning mt-1">
+                  <Link
+                    href={`/clients/${c.id}?tab=details`}
+                    className="block t-caption text-warning mt-1"
+                  >
                     Set a rate to bill {formatHoursMinutes(c.stats.noRateSeconds)}
                   </Link>
                 )}
@@ -209,7 +248,10 @@ export default async function ClientPage({
                 <Empty
                   action={
                     me.isAdmin ? (
-                      <Link href={`/clients/${c.id}?tab=projects#new-project`} className="btn btn-primary">
+                      <Link
+                        href={`/clients/${c.id}?tab=projects#new-project`}
+                        className="btn btn-primary"
+                      >
                         Add a project
                       </Link>
                     ) : null
@@ -227,15 +269,26 @@ export default async function ClientPage({
                 {c.lastInvoice ? (
                   <div className="card p-5 space-y-3">
                     <div className="flex items-center justify-between">
-                      <Link href={`/invoices/${c.lastInvoice.id}`} className="font-semibold tnum hover:text-accent">
+                      <Link
+                        href={`/invoices/${c.lastInvoice.id}`}
+                        className="font-semibold tnum hover:text-accent"
+                      >
                         {c.lastInvoice.number}
                       </Link>
-                      <StatusChip label={c.lastInvoice.display.label} tone={c.lastInvoice.display.tone} />
+                      <StatusChip
+                        label={c.lastInvoice.display.label}
+                        tone={c.lastInvoice.display.tone}
+                      />
                     </div>
                     <div className="flex justify-between text-muted">
-                      <span>{c.lastInvoice.issueDate ? formatDateLong(c.lastInvoice.issueDate) : "—"}</span>
+                      <span>
+                        {c.lastInvoice.issueDate ? formatDateLong(c.lastInvoice.issueDate) : "—"}
+                      </span>
                       <span className="tnum text-ink font-semibold">
-                        {formatMoney({ minor: c.lastInvoice.totalMinor, currency: c.lastInvoice.currency })}
+                        {formatMoney({
+                          minor: c.lastInvoice.totalMinor,
+                          currency: c.lastInvoice.currency,
+                        })}
                       </span>
                     </div>
                     {/* The fast path for monthly fixed invoices (F7) */}
@@ -280,7 +333,11 @@ export default async function ClientPage({
                     {c.projects.filter((p) => p.status === "completed").length} completed
                   </summary>
                   <div className="mt-3">
-                    <ProjectList projects={c.projects.filter((p) => p.status === "completed")} currency={c.currency} isAdmin={me.isAdmin} />
+                    <ProjectList
+                      projects={c.projects.filter((p) => p.status === "completed")}
+                      currency={c.currency}
+                      isAdmin={me.isAdmin}
+                    />
                   </div>
                 </details>
               )}
@@ -294,7 +351,13 @@ export default async function ClientPage({
                 <input type="hidden" name="currency" value={c.currency} />
                 <div className="flex-1 min-w-[200px]">
                   <Field name="name" label="Name">
-                    <input id="f-name" name="name" className="input" required autoFocus={tab === "projects" && active.length === 0} />
+                    <input
+                      id="f-name"
+                      name="name"
+                      className="input"
+                      required
+                      autoFocus={tab === "projects" && active.length === 0}
+                    />
                   </Field>
                 </div>
                 <div className="w-36">
@@ -304,7 +367,11 @@ export default async function ClientPage({
                       name="rate"
                       className="input"
                       inputMode="decimal"
-                      placeholder={c.rateMinor != null ? minorToDecimalString(c.rateMinor, c.currency) : "Optional"}
+                      placeholder={
+                        c.rateMinor != null
+                          ? minorToDecimalString(c.rateMinor, c.currency)
+                          : "Optional"
+                      }
                     />
                   </Field>
                 </div>
@@ -318,7 +385,11 @@ export default async function ClientPage({
 
       {tab === "invoices" && me.isAdmin && (
         <div>
-          {c.invoices && c.invoices.length > 0 ? <InvoiceTable invoices={c.invoices} /> : <Empty>No invoices for {c.name} yet.</Empty>}
+          {c.invoices && c.invoices.length > 0 ? (
+            <InvoiceTable invoices={c.invoices} />
+          ) : (
+            <Empty>No invoices for {c.name} yet.</Empty>
+          )}
         </div>
       )}
 
@@ -327,23 +398,61 @@ export default async function ClientPage({
           <input type="hidden" name="id" value={c.id} />
           <input type="hidden" name="currentCurrency" value={c.currency} />
           <Field name="name" label="Name">
-            <input id="f-name" name="name" className="input" required defaultValue={c.name} autoComplete="organization" />
+            <input
+              id="f-name"
+              name="name"
+              className="input"
+              required
+              defaultValue={c.name}
+              autoComplete="organization"
+            />
           </Field>
           <Field name="contactName" label="Contact name">
-            <input id="f-contactName" name="contactName" className="input" defaultValue={c.contactName} autoComplete="name" />
+            <input
+              id="f-contactName"
+              name="contactName"
+              className="input"
+              defaultValue={c.contactName}
+              autoComplete="name"
+            />
           </Field>
           <Field name="billingEmails" label="Billing emails" hint="Separate several with commas.">
-            <input id="f-billingEmails" name="billingEmails" className="input" defaultValue={c.billingEmails.join(", ")} autoComplete="email" />
+            <input
+              id="f-billingEmails"
+              name="billingEmails"
+              className="input"
+              defaultValue={c.billingEmails.join(", ")}
+              autoComplete="email"
+            />
           </Field>
           <Field name="address" label="Address">
-            <textarea id="f-address" name="address" className="textarea" rows={3} defaultValue={c.address} autoComplete="street-address" />
+            <textarea
+              id="f-address"
+              name="address"
+              className="textarea"
+              rows={3}
+              defaultValue={c.address}
+              autoComplete="street-address"
+            />
           </Field>
           <div className="grid grid-cols-2 gap-4">
             <Field name="taxId" label="Tax ID">
               <input id="f-taxId" name="taxId" className="input" defaultValue={c.taxId} />
             </Field>
-            <Field name="termsDays" label="Payment terms (days)" hint="Empty uses the workspace default.">
-              <input id="f-termsDays" name="termsDays" type="number" min={0} max={365} className="input" defaultValue={c.termsDays ?? ""} />
+            <Field
+              name="termsDays"
+              label="Payment terms (days)"
+              hint="Empty uses the workspace default."
+            >
+              <input
+                id="f-termsDays"
+                name="termsDays"
+                type="number"
+                min={0}
+                max={365}
+                className="input"
+                defaultValue={c.termsDays ?? ""}
+              />
             </Field>
           </div>
           <div className="grid grid-cols-2 gap-4">
@@ -358,13 +467,29 @@ export default async function ClientPage({
             >
               <CurrencySelect value={c.currency} disabled={c.currencyLocked} />
             </Field>
-            <Field name="rate" label="Hourly rate" hint="Empty: projects and tasks set their own, or the workspace default applies.">
-              <input id="f-rate" name="rate" className="input" inputMode="decimal" defaultValue={moneyValue(c.rateMinor, c.currency)} />
+            <Field
+              name="rate"
+              label="Hourly rate"
+              hint="Empty: projects and tasks set their own, or the workspace default applies."
+            >
+              <input
+                id="f-rate"
+                name="rate"
+                className="input"
+                inputMode="decimal"
+                defaultValue={moneyValue(c.rateMinor, c.currency)}
+              />
             </Field>
           </div>
           <ColourPicker value={c.colour} />
           <Field name="notes" label="Notes">
-            <textarea id="f-notes" name="notes" className="textarea" rows={3} defaultValue={c.notes} />
+            <textarea
+              id="f-notes"
+              name="notes"
+              className="textarea"
+              rows={3}
+              defaultValue={c.notes}
+            />
           </Field>
           <div className="pt-2">
             <Submit pendingText="Saving…">Save</Submit>
@@ -375,7 +500,15 @@ export default async function ClientPage({
   );
 }
 
-function ProjectList({ projects, currency, isAdmin }: { projects: Project[]; currency: string; isAdmin: boolean }) {
+function ProjectList({
+  projects,
+  currency,
+  isAdmin,
+}: {
+  projects: Project[];
+  currency: string;
+  isAdmin: boolean;
+}) {
   return (
     <div className="card overflow-x-auto">
       <table className="table">
@@ -395,7 +528,9 @@ function ProjectList({ projects, currency, isAdmin }: { projects: Project[]; cur
                   {p.name}
                 </Link>
                 {isAdmin && p.rateMinor != null && (
-                  <span className="pill ml-2">{formatMoney({ minor: p.rateMinor, currency })}/h</span>
+                  <span className="pill ml-2">
+                    {formatMoney({ minor: p.rateMinor, currency })}/h
+                  </span>
                 )}
               </td>
               <td className="w-48">
@@ -407,12 +542,20 @@ function ProjectList({ projects, currency, isAdmin }: { projects: Project[]; cur
                     </span>
                   </div>
                 ) : p.budgetKind === "money" && p.budgetValue && isAdmin ? (
-                  <span className="t-caption">{formatMoney({ minor: p.budgetValue, currency })} budget</span>
+                  <span className="t-caption">
+                    {formatMoney({ minor: p.budgetValue, currency })} budget
+                  </span>
                 ) : (
                   <span className="text-faint">—</span>
                 )}
               </td>
-              <td className="num">{p.trackedSeconds ? formatHoursMinutes(p.trackedSeconds) : <span className="text-faint">—</span>}</td>
+              <td className="num">
+                {p.trackedSeconds ? (
+                  formatHoursMinutes(p.trackedSeconds)
+                ) : (
+                  <span className="text-faint">—</span>
+                )}
+              </td>
               {isAdmin && (
                 <td className="num">
                   <Money m={{ minor: p.unbilledMinor ?? 0, currency }} dash />
@@ -444,7 +587,10 @@ function InvoiceTable({ invoices }: { invoices: InvoiceRow[] }) {
           {invoices.map((i) => (
             <tr key={i.id}>
               <td>
-                <Link href={`/invoices/${i.id}`} className={`font-semibold tnum hover:text-accent ${i.status === "void" ? "line-through text-muted" : ""}`}>
+                <Link
+                  href={`/invoices/${i.id}`}
+                  className={`font-semibold tnum hover:text-accent ${i.status === "void" ? "line-through text-muted" : ""}`}
+                >
                   {i.number ?? "Draft"}
                 </Link>
                 {i.rev > 1 && <span className="t-caption ml-1">rev {i.rev}</span>}
@@ -453,7 +599,10 @@ function InvoiceTable({ invoices }: { invoices: InvoiceRow[] }) {
               <td className="text-muted">{i.dueDate ? formatDateLong(i.dueDate) : "—"}</td>
               <td className="num">{formatMoney({ minor: i.totalMinor, currency: i.currency })}</td>
               <td className="num">
-                <Money m={{ minor: i.status === "issued" ? i.balanceMinor : 0, currency: i.currency }} dash />
+                <Money
+                  m={{ minor: i.status === "issued" ? i.balanceMinor : 0, currency: i.currency }}
+                  dash
+                />
               </td>
               <td>
                 <StatusChip label={i.display.label} tone={i.display.tone} />

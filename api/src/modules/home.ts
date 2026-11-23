@@ -20,22 +20,45 @@ export class HomeController {
     const weekStart = startOfWeek(today, ctx.member.weekStart);
     const lastWeekStart = addDays(weekStart, -7);
     const entries = await this.prisma.timeEntry.findMany({
-      where: { memberId: ctx.member.id, deletedAt: null, date: { gte: s2d(lastWeekStart), lte: s2d(addDays(weekStart, 6)) } },
-      select: { date: true, durationSeconds: true, state: true, task: { select: { project: { select: { client: { select: { id: true, name: true, colour: true } } } } } } },
+      where: {
+        memberId: ctx.member.id,
+        deletedAt: null,
+        date: { gte: s2d(lastWeekStart), lte: s2d(addDays(weekStart, 6)) },
+      },
+      select: {
+        date: true,
+        durationSeconds: true,
+        state: true,
+        task: {
+          select: {
+            project: { select: { client: { select: { id: true, name: true, colour: true } } } },
+          },
+        },
+      },
     });
     const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)).map((d) => {
       const byClient = new Map<string, { name: string; colour: number; seconds: number }>();
       for (const e of entries.filter((x) => d2s(x.date) === d)) {
         const c = e.task?.project.client;
         const key = c?.id ?? "none";
-        const cur = byClient.get(key) ?? { name: c?.name ?? "No task", colour: c?.colour ?? 6, seconds: 0 };
+        const cur = byClient.get(key) ?? {
+          name: c?.name ?? "No task",
+          colour: c?.colour ?? 6,
+          seconds: 0,
+        };
         cur.seconds += e.durationSeconds;
         byClient.set(key, cur);
       }
-      return { date: d, clients: [...byClient.values()], seconds: [...byClient.values()].reduce((s, c) => s + c.seconds, 0) };
+      return {
+        date: d,
+        clients: [...byClient.values()],
+        seconds: [...byClient.values()].reduce((s, c) => s + c.seconds, 0),
+      };
     });
     const thisWeek = days.reduce((s, d) => s + d.seconds, 0);
-    const lastWeek = entries.filter((e) => (d2s(e.date) as string) < weekStart).reduce((s, e) => s + e.durationSeconds, 0);
+    const lastWeek = entries
+      .filter((e) => (d2s(e.date) as string) < weekStart)
+      .reduce((s, e) => s + e.durationSeconds, 0);
     const memberHasTasks = (await this.prisma.task.count({ where: { workspaceId: ws.id } })) > 0;
     const clientCount = await this.prisma.client.count({ where: { workspaceId: ws.id } });
     const base = {
@@ -64,7 +87,8 @@ export class HomeController {
     const ready = [...rollup.values()]
       .map((r) => {
         const c = clients.find((x) => x.id === r.clientId)!;
-        const threshold = c.readyThresholdMinor ?? (c.currency === ws.currency ? ws.readyThresholdMinor : null);
+        const threshold =
+          c.readyThresholdMinor ?? (c.currency === ws.currency ? ws.readyThresholdMinor : null);
         return {
           ...r,
           name: c.name,
@@ -87,10 +111,20 @@ export class HomeController {
       ready,
       outstanding: {
         outstanding: group(outstanding, (i) => i.balanceMinor),
-        overdue: group(outstanding.filter((i) => i.display.key === "overdue"), (i) => i.balanceMinor),
-        paidThisMonth: group(invoices.filter((i) => i.lastPaidOn?.startsWith(month)), (i) => i.netPaidMinor),
+        overdue: group(
+          outstanding.filter((i) => i.display.key === "overdue"),
+          (i) => i.balanceMinor,
+        ),
+        paidThisMonth: group(
+          invoices.filter((i) => i.lastPaidOn?.startsWith(month)),
+          (i) => i.netPaidMinor,
+        ),
         top: outstanding
-          .sort((a, b) => (a.display.key === "overdue" ? -1 : 0) - (b.display.key === "overdue" ? -1 : 0) || (a.dueDate ?? "").localeCompare(b.dueDate ?? ""))
+          .sort(
+            (a, b) =>
+              (a.display.key === "overdue" ? -1 : 0) - (b.display.key === "overdue" ? -1 : 0) ||
+              (a.dueDate ?? "").localeCompare(b.dueDate ?? ""),
+          )
           .slice(0, 5),
       },
     };

@@ -24,6 +24,7 @@ import {
 import type { Ctx } from "../common/auth";
 import { d2s, s2d } from "../common/dates";
 import { conflict, invalid, notFound } from "../common/errors";
+import { env } from "../env";
 import type {
   Client,
   InvoiceLine,
@@ -32,7 +33,6 @@ import type {
   PaymentAccount,
   Workspace,
 } from "../generated/prisma/client";
-import { env } from "../env";
 import { Prisma, type Tx } from "../prisma.service";
 
 export const TEMPLATE_VERSION = "sheet-1";
@@ -51,7 +51,13 @@ export function fromSnapshot(ws: Workspace): FromSnapshot {
 }
 
 export function toSnapshot(c: Client): ToSnapshot {
-  return { name: c.name, contactName: c.contactName, address: c.address, taxId: c.taxId, emails: c.billingEmails };
+  return {
+    name: c.name,
+    contactName: c.contactName,
+    address: c.address,
+    taxId: c.taxId,
+    emails: c.billingEmails,
+  };
 }
 
 export function accountSnapshot(a: PaymentAccount): PaymentAccountSnapshot {
@@ -90,7 +96,9 @@ export async function resolveAccount(
     const a = await tx.paymentAccount.findUnique({ where: { id: client.defaultPaymentAccountId } });
     if (a && a.currency === currency && !a.archivedAt) return a;
   }
-  return tx.paymentAccount.findFirst({ where: { workspaceId: ws.id, currency, isDefault: true, archivedAt: null } });
+  return tx.paymentAccount.findFirst({
+    where: { workspaceId: ws.id, currency, isDefault: true, archivedAt: null },
+  });
 }
 
 type VersionFull = InvoiceVersion & {
@@ -124,9 +132,12 @@ export async function buildSheet(
 ): Promise<SheetData> {
   const computed = sheetFromLines(
     editableLines(v),
-    v.taxes.sort((a, b) => a.position - b.position).map((t) => ({ id: t.id, name: t.name, rateBp: t.rateBp })),
+    v.taxes
+      .sort((a, b) => a.position - b.position)
+      .map((t) => ({ id: t.id, name: t.name, rateBp: t.rateBp })),
   );
-  let account: PaymentAccountSnapshot | null = v.paymentAccountSnapshot as unknown as PaymentAccountSnapshot | null;
+  let account: PaymentAccountSnapshot | null =
+    v.paymentAccountSnapshot as unknown as PaymentAccountSnapshot | null;
   if (!v.frozenAt && !account) {
     const a = await resolveAccount(tx, ws, invoice.client, v, invoice.currency);
     account = a ? accountSnapshot(a) : null;
@@ -154,18 +165,29 @@ export async function buildSheet(
 }
 
 export const versionInclude = {
-  lines: { include: { taxes: { select: { versionTaxId: true } } }, orderBy: { position: "asc" as const } },
+  lines: {
+    include: { taxes: { select: { versionTaxId: true } } },
+    orderBy: { position: "asc" as const },
+  },
   taxes: { orderBy: { position: "asc" as const } },
 } satisfies Prisma.InvoiceVersionInclude;
 
 export async function writeTotals(tx: Tx, versionId: string) {
-  const v = await tx.invoiceVersion.findUniqueOrThrow({ where: { id: versionId }, include: versionInclude });
-  const s = sheetFromLines(editableLines(v), v.taxes.map((t) => ({ id: t.id, name: t.name, rateBp: t.rateBp })));
+  const v = await tx.invoiceVersion.findUniqueOrThrow({
+    where: { id: versionId },
+    include: versionInclude,
+  });
+  const s = sheetFromLines(
+    editableLines(v),
+    v.taxes.map((t) => ({ id: t.id, name: t.name, rateBp: t.rateBp })),
+  );
   await tx.invoiceVersion.update({
     where: { id: versionId },
     data: {
       subtotal: s.subtotalMinor,
-      discountTotal: s.lines.filter((l) => l.kind === "discount").reduce((a, l) => a + l.amountMinor, 0),
+      discountTotal: s.lines
+        .filter((l) => l.kind === "discount")
+        .reduce((a, l) => a + l.amountMinor, 0),
       taxTotal: s.taxes.reduce((a, t) => a + t.amountMinor, 0),
       total: s.totalMinor,
     },
@@ -175,7 +197,11 @@ export async function writeTotals(tx: Tx, versionId: string) {
 
 // ── Entries → lines ──────────────────────────────────────────────────────────────────────
 
-export async function billableEntries(tx: Tx, ws: Workspace, entryIds: string[]): Promise<(BillableEntry & { clientId: string; rateLabel: string })[]> {
+export async function billableEntries(
+  tx: Tx,
+  ws: Workspace,
+  entryIds: string[],
+): Promise<(BillableEntry & { clientId: string; rateLabel: string })[]> {
   if (entryIds.length === 0) return [];
   const rows = await tx.timeEntry.findMany({
     where: { id: { in: entryIds }, workspaceId: ws.id },
@@ -213,7 +239,13 @@ export async function billableEntries(tx: Tx, ws: Workspace, entryIds: string[])
 }
 
 /** Insert built lines into a version, with all of the version's taxes, and link entries. */
-export async function insertLines(tx: Tx, versionId: string, lines: BuiltLine[], taxIds: string[], startPos = 0) {
+export async function insertLines(
+  tx: Tx,
+  versionId: string,
+  lines: BuiltLine[],
+  taxIds: string[],
+  startPos = 0,
+) {
   let pos = startPos;
   for (const l of lines) {
     const line = await tx.invoiceLine.create({
@@ -232,11 +264,17 @@ export async function insertLines(tx: Tx, versionId: string, lines: BuiltLine[],
       },
     });
     if (taxIds.length) {
-      await tx.invoiceLineTax.createMany({ data: taxIds.map((t) => ({ lineId: line.id, versionTaxId: t })) });
+      await tx.invoiceLineTax.createMany({
+        data: taxIds.map((t) => ({ lineId: line.id, versionTaxId: t })),
+      });
     }
     if (l.entryIds.length) {
       await tx.invoiceLineEntry.createMany({
-        data: l.entryIds.map((id) => ({ lineId: line.id, timeEntryId: id, seconds: l.entrySeconds[id] ?? 0 })),
+        data: l.entryIds.map((id) => ({
+          lineId: line.id,
+          timeEntryId: id,
+          seconds: l.entrySeconds[id] ?? 0,
+        })),
       });
     }
   }
@@ -247,7 +285,13 @@ export async function insertLines(tx: Tx, versionId: string, lines: BuiltLine[],
  * Claim entries for an invoice: they must be unbilled hourly time of this client. The claim is
  * an UPDATE … WHERE invoice_id IS NULL, so two drafts can never claim the same entry (S9).
  */
-export async function claimEntries(tx: Tx, ws: Workspace, clientId: string, invoiceId: string, entryIds: string[]) {
+export async function claimEntries(
+  tx: Tx,
+  ws: Workspace,
+  clientId: string,
+  invoiceId: string,
+  entryIds: string[],
+) {
   if (entryIds.length === 0) return;
   const r = await tx.timeEntry.updateMany({
     where: {
@@ -263,7 +307,10 @@ export async function claimEntries(tx: Tx, ws: Workspace, clientId: string, invo
     data: { invoiceId },
   });
   if (r.count !== entryIds.length) {
-    throw conflict("entries_unavailable", "Some entries were billed, changed or deleted meanwhile. Reload and try again.");
+    throw conflict(
+      "entries_unavailable",
+      "Some entries were billed, changed or deleted meanwhile. Reload and try again.",
+    );
   }
 }
 
@@ -272,11 +319,16 @@ export async function claimEntries(tx: Tx, ws: Workspace, clientId: string, invo
 export async function openCorrectionTx(tx: Tx, ctx: Ctx, invoiceId: string) {
   const inv = await tx.invoice.findFirst({
     where: { id: invoiceId, workspaceId: ctx.workspace.id },
-    include: { currentVersion: { include: { ...versionInclude, lines: { include: { taxes: true, entries: true } } } } },
+    include: {
+      currentVersion: {
+        include: { ...versionInclude, lines: { include: { taxes: true, entries: true } } },
+      },
+    },
   });
   if (!inv) throw notFound("Invoice not found");
   if (inv.status !== "issued") throw conflict("not_issued", "Only sent invoices are corrected.");
-  if (inv.source === "paydirt") throw conflict("imported", "Imported invoices can't be corrected. Duplicate it instead.");
+  if (inv.source === "paydirt")
+    throw conflict("imported", "Imported invoices can't be corrected. Duplicate it instead.");
   const open = await tx.invoiceVersion.findFirst({ where: { invoiceId, frozenAt: null } });
   if (open) return open;
   const cur = inv.currentVersion;
@@ -306,7 +358,9 @@ export async function openCorrectionTx(tx: Tx, ctx: Ctx, invoiceId: string) {
   });
   const taxMap = new Map<string, string>();
   for (const t of cur.taxes) {
-    const nt = await tx.invoiceVersionTax.create({ data: { versionId: v.id, name: t.name, rateBp: t.rateBp, position: t.position } });
+    const nt = await tx.invoiceVersionTax.create({
+      data: { versionId: v.id, name: t.name, rateBp: t.rateBp, position: t.position },
+    });
     taxMap.set(t.id, nt.id);
   }
   for (const l of cur.lines) {
@@ -328,14 +382,32 @@ export async function openCorrectionTx(tx: Tx, ctx: Ctx, invoiceId: string) {
       },
     });
     if (l.taxes.length) {
-      await tx.invoiceLineTax.createMany({ data: l.taxes.map((t) => ({ lineId: nl.id, versionTaxId: taxMap.get(t.versionTaxId) as string })) });
+      await tx.invoiceLineTax.createMany({
+        data: l.taxes.map((t) => ({
+          lineId: nl.id,
+          versionTaxId: taxMap.get(t.versionTaxId) as string,
+        })),
+      });
     }
     if (l.entries.length) {
-      await tx.invoiceLineEntry.createMany({ data: l.entries.map((e) => ({ lineId: nl.id, timeEntryId: e.timeEntryId, seconds: e.seconds })) });
+      await tx.invoiceLineEntry.createMany({
+        data: l.entries.map((e) => ({
+          lineId: nl.id,
+          timeEntryId: e.timeEntryId,
+          seconds: e.seconds,
+        })),
+      });
     }
   }
   await tx.invoiceActivity.create({
-    data: { invoiceId, versionId: v.id, kind: "correction_opened", actor: "member", actorId: ctx.member.id, data: { rev: v.rev } },
+    data: {
+      invoiceId,
+      versionId: v.id,
+      kind: "correction_opened",
+      actor: "member",
+      actorId: ctx.member.id,
+      data: { rev: v.rev },
+    },
   });
   return v;
 }
@@ -344,7 +416,12 @@ export async function openCorrectionTx(tx: Tx, ctx: Ctx, invoiceId: string) {
  * Apply staged entry changes (08 §5.2) inside the freeze transaction. The guard trigger lets
  * them through because paypure.applying_version is set for this transaction only.
  */
-export async function applyStagedChanges(tx: Tx, ws: Workspace, versionId: string, layout: LineLayout) {
+export async function applyStagedChanges(
+  tx: Tx,
+  ws: Workspace,
+  versionId: string,
+  layout: LineLayout,
+) {
   const changes = await tx.invoiceEntryChange.findMany({ where: { versionId } });
   if (changes.length === 0) return;
   await tx.$executeRaw`SELECT set_config('paypure.applying_version', ${versionId}, true)`;
@@ -355,29 +432,43 @@ export async function applyStagedChanges(tx: Tx, ws: Workspace, versionId: strin
     if (segs) {
       await tx.timeEntrySegment.deleteMany({ where: { timeEntryId: ch.timeEntryId } });
       await tx.timeEntrySegment.createMany({
-        data: segs.map((s) => ({ workspaceId: ws.id, timeEntryId: ch.timeEntryId, startedAt: new Date(s.startedAt), endedAt: new Date(s.endedAt) })),
+        data: segs.map((s) => ({
+          workspaceId: ws.id,
+          timeEntryId: ch.timeEntryId,
+          startedAt: new Date(s.startedAt),
+          endedAt: new Date(s.endedAt),
+        })),
       });
     }
     const data: Prisma.TimeEntryUncheckedUpdateInput = { version: { increment: 1 } };
     if (val<string>("taskId") !== undefined) data.taskId = val<string>("taskId");
     if (val<string>("date") !== undefined) data.date = s2d(val<string>("date") as string);
-    if (val<string | null>("startedAt") !== undefined) data.startedAt = val<string | null>("startedAt");
+    if (val<string | null>("startedAt") !== undefined)
+      data.startedAt = val<string | null>("startedAt");
     if (val<string | null>("endedAt") !== undefined) data.endedAt = val<string | null>("endedAt");
-    if (val<number>("durationSeconds") !== undefined) data.durationSeconds = val<number>("durationSeconds");
+    if (val<number>("durationSeconds") !== undefined)
+      data.durationSeconds = val<number>("durationSeconds");
     if (val<string>("note") !== undefined) data.note = val<string>("note");
     if (val<boolean>("billable") !== undefined) data.billable = val<boolean>("billable");
     if (ch.op === "delete") data.deletedAt = new Date();
     await tx.timeEntry.update({ where: { id: ch.timeEntryId }, data });
   }
   // Entries that moved to another client, became non-billable or were deleted leave the invoice.
-  const inv = await tx.invoiceVersion.findUniqueOrThrow({ where: { id: versionId }, select: { invoice: { select: { id: true, clientId: true } } } });
+  const inv = await tx.invoiceVersion.findUniqueOrThrow({
+    where: { id: versionId },
+    select: { invoice: { select: { id: true, clientId: true } } },
+  });
   const affected = await tx.timeEntry.findMany({
     where: { id: { in: changes.map((c) => c.timeEntryId) } },
     include: { task: { include: { project: true } } },
   });
-  const leaving = affected.filter((e) => e.deletedAt || !e.billable || e.task?.project.clientId !== inv.invoice.clientId).map((e) => e.id);
+  const leaving = affected
+    .filter((e) => e.deletedAt || !e.billable || e.task?.project.clientId !== inv.invoice.clientId)
+    .map((e) => e.id);
   if (leaving.length) {
-    await tx.invoiceLineEntry.deleteMany({ where: { timeEntryId: { in: leaving }, line: { versionId } } });
+    await tx.invoiceLineEntry.deleteMany({
+      where: { timeEntryId: { in: leaving }, line: { versionId } },
+    });
   }
   await regenerateLines(tx, ws, versionId, layout, { onlyEntryIds: affected.map((e) => e.id) });
   await tx.$executeRaw`SELECT set_config('paypure.applying_version', '', true)`;
@@ -410,7 +501,10 @@ export async function regenerateLines(
       continue;
     }
     const entries = (await billableEntries(tx, ws, ids)).filter((e) => !!e);
-    const built = buildTimeLines(entries, { ...layout, mode: layout.mode === "per_entry" && ids.length > 1 ? "per_task" : layout.mode });
+    const built = buildTimeLines(entries, {
+      ...layout,
+      mode: layout.mode === "per_entry" && ids.length > 1 ? "per_task" : layout.mode,
+    });
     const b = built[0];
     const overrides = new Set((line.overrides as string[]) ?? []);
     const qty = overrides.has("qtyHundredths") ? line.qtyHundredths : b.qtyHundredths;
@@ -430,14 +524,22 @@ export async function regenerateLines(
     for (const le of line.entries) {
       const sec = b.entrySeconds[le.timeEntryId];
       if (sec !== undefined && sec !== le.seconds) {
-        await tx.invoiceLineEntry.update({ where: { lineId_timeEntryId: { lineId: line.id, timeEntryId: le.timeEntryId } }, data: { seconds: sec } });
+        await tx.invoiceLineEntry.update({
+          where: { lineId_timeEntryId: { lineId: line.id, timeEntryId: le.timeEntryId } },
+          data: { seconds: sec },
+        });
       }
     }
   }
 }
 
 /** Lines whose entries or rates changed since they were made (08 §5.2 "N lines out of date"). */
-export async function outdatedLineIds(tx: Tx, ws: Workspace, versionId: string, layout: LineLayout): Promise<string[]> {
+export async function outdatedLineIds(
+  tx: Tx,
+  ws: Workspace,
+  versionId: string,
+  layout: LineLayout,
+): Promise<string[]> {
   const v = await tx.invoiceVersion.findUniqueOrThrow({
     where: { id: versionId },
     include: { lines: { include: { entries: true } } },
@@ -452,26 +554,36 @@ export async function outdatedLineIds(tx: Tx, ws: Workspace, versionId: string, 
     }
     const entries = await billableEntries(tx, ws, ids);
     const alive = await tx.timeEntry.count({ where: { id: { in: ids }, deletedAt: null } });
-    const built = buildTimeLines(entries, { ...layout, mode: layout.mode === "per_entry" && ids.length > 1 ? "per_task" : layout.mode });
-    if (alive !== ids.length || built[0]?.sourceFingerprint !== line.sourceFingerprint) out.push(line.id);
+    const built = buildTimeLines(entries, {
+      ...layout,
+      mode: layout.mode === "per_entry" && ids.length > 1 ? "per_task" : layout.mode,
+    });
+    if (alive !== ids.length || built[0]?.sourceFingerprint !== line.sourceFingerprint)
+      out.push(line.id);
   }
   return out;
 }
 
 // ── Numbering + freezing (08 §6, §3.2, §7.2) ─────────────────────────────────────────────
 
-export async function assignNumber(tx: Tx, ws: Workspace, invoiceId: string, issueDate: string) {
+export async function assignNumber(tx: Tx, ws: Workspace, _invoiceId: string, issueDate: string) {
   const period = numberPeriod(ws.numberReset, issueDate);
   const latest = await tx.$queryRaw<{ d: Date | null }[]>`
     SELECT MAX(v.issue_date) AS d FROM invoices i JOIN invoice_versions v ON v.id = i.current_version_id
     WHERE i.workspace_id = ${ws.id}::uuid AND i.number_period = ${period} AND i.status <> 'draft'`;
   const latestDate = d2s(latest[0]?.d ?? null);
   if (latestDate && issueDate < latestDate) {
-    throw invalid(`The issue date can't be before the last issued invoice (${formatDateLong(latestDate)}).`, {
-      fields: { issueDate: "Before the last issued invoice" },
-    });
+    throw invalid(
+      `The issue date can't be before the last issued invoice (${formatDateLong(latestDate)}).`,
+      {
+        fields: { issueDate: "Before the last issued invoice" },
+      },
+    );
   }
-  const maxUsed = await tx.invoice.aggregate({ where: { workspaceId: ws.id, numberPeriod: period }, _max: { numberSeq: true } });
+  const maxUsed = await tx.invoice.aggregate({
+    where: { workspaceId: ws.id, numberPeriod: period },
+    _max: { numberSeq: true },
+  });
   await tx.$executeRaw`
     INSERT INTO invoice_sequences (workspace_id, period, next_seq)
     VALUES (${ws.id}::uuid, ${period}, ${(maxUsed._max.numberSeq ?? 0) + 1})
@@ -486,13 +598,27 @@ export async function assignNumber(tx: Tx, ws: Workspace, invoiceId: string, iss
 
 export function contentHash(sheet: SheetData): string {
   const canonical = JSON.stringify(sheet, Object.keys(sheet).sort());
-  return createHash("sha256").update(canonical + JSON.stringify(sheet.lines)).digest("hex");
+  return createHash("sha256")
+    .update(canonical + JSON.stringify(sheet.lines))
+    .digest("hex");
 }
 
-export async function freezeVersion(tx: Tx, ctx: Ctx, invoiceId: string, versionId: string, extra: Partial<InvoiceVersion> = {}) {
+export async function freezeVersion(
+  tx: Tx,
+  ctx: Ctx,
+  invoiceId: string,
+  versionId: string,
+  extra: Partial<InvoiceVersion> = {},
+) {
   const ws = ctx.workspace;
-  const inv = await tx.invoice.findUniqueOrThrow({ where: { id: invoiceId }, include: { client: true } });
-  const v = await tx.invoiceVersion.findUniqueOrThrow({ where: { id: versionId }, include: versionInclude });
+  const inv = await tx.invoice.findUniqueOrThrow({
+    where: { id: invoiceId },
+    include: { client: true },
+  });
+  const v = await tx.invoiceVersion.findUniqueOrThrow({
+    where: { id: versionId },
+    include: versionInclude,
+  });
   const account = v.paymentAccountSnapshot
     ? null
     : await resolveAccount(tx, ws, inv.client, v, inv.currency);
@@ -511,18 +637,29 @@ export async function freezeVersion(tx: Tx, ctx: Ctx, invoiceId: string, version
     },
   });
   await writeTotals(tx, versionId);
-  const fresh = await tx.invoiceVersion.findUniqueOrThrow({ where: { id: versionId }, include: versionInclude });
+  const fresh = await tx.invoiceVersion.findUniqueOrThrow({
+    where: { id: versionId },
+    include: versionInclude,
+  });
   const sheet = await buildSheet(tx, ws, { ...inv, client: inv.client }, fresh);
   await tx.invoiceVersion.update({
     where: { id: versionId },
-    data: { contentHash: contentHash(sheet), templateVersion: TEMPLATE_VERSION, frozenAt: new Date(), frozenBy: ctx.member.id },
+    data: {
+      contentHash: contentHash(sheet),
+      templateVersion: TEMPLATE_VERSION,
+      frozenAt: new Date(),
+      frozenBy: ctx.member.id,
+    },
   });
   return sheet;
 }
 
 // ── Email (08 §7) ────────────────────────────────────────────────────────────────────────
 
-export const DEFAULT_TEMPLATES: Record<"invoice" | "correction" | "reminder" | "thank_you", { subject: string; body: string }> = {
+export const DEFAULT_TEMPLATES: Record<
+  "invoice" | "correction" | "reminder" | "thank_you",
+  { subject: string; body: string }
+> = {
   invoice: {
     subject: "Invoice {{number}} from {{business_name}}",
     body: "Hi {{client_name}},\n\nPlease find invoice {{number}} for {{total}} attached, due on {{due_date}}.\n\nYou can view it online: {{link}}\n\nThank you,\n{{sender_name}}",
@@ -563,7 +700,10 @@ export function emailVars(input: {
   paidMinor?: number;
 }): Record<string, string | undefined> {
   const today = todayIn(input.ws.timeZone);
-  const overdue = input.dueDate && input.dueDate < today ? Math.round((Date.parse(today) - Date.parse(input.dueDate)) / 86400000) : 0;
+  const overdue =
+    input.dueDate && input.dueDate < today
+      ? Math.round((Date.parse(today) - Date.parse(input.dueDate)) / 86400000)
+      : 0;
   const m = (minor: number) => formatMoney({ minor, currency: input.currency }, { withCode: true });
   return {
     number: input.number ?? "(assigned on send)",
@@ -582,14 +722,19 @@ export function emailVars(input: {
 }
 
 function escapeHtml(s: string) {
-  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
 }
 
 export function renderEmailHtml(text: string) {
-  const paras = text.split(/\n{2,}/).map((p) =>
-    `<p>${escapeHtml(p)
-      .replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1">$1</a>')
-      .replace(/\n/g, "<br>")}</p>`,
+  const paras = text.split(/\n{2,}/).map(
+    (p) =>
+      `<p>${escapeHtml(p)
+        .replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1">$1</a>')
+        .replace(/\n/g, "<br>")}</p>`,
   );
   return `<!doctype html><html><body style="font-family:Inter,system-ui,sans-serif;font-size:14px;line-height:20px;color:#1B1A18">${paras.join("")}</body></html>`;
 }

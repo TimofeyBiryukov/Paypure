@@ -1,12 +1,31 @@
 {
   "$schema": "https://biomejs.dev/schemas/2.6.8/schema.json",
-  "files": { "includes": ["**", "!**/dist", "!**/.next", "!**/generated", "!docs", "!data"] },
+  "files": {
+    "includes": ["**", "!**/dist", "!**/.next", "!**/generated", "!docs", "!data", "!.claude"]
+  },
   "formatter": { "indentStyle": "space", "indentWidth": 2, "lineWidth": 100 },
   "linter": {
     "rules": {
       "preset": "recommended",
-      "a11y": { "useButtonType": "error" },
-      "style": { "useImportType": "off" }
+      "a11y": {
+        "useButtonType": "error",
+        "noAutofocus": "warn",
+        "noNoninteractiveElementToInteractiveRole": "warn",
+        "useSemanticElements": "warn"
+      },
+      "complexity": { "noImportantStyles": "warn" },
+      "correctness": { "useExhaustiveDependencies": "warn" },
+      "performance": { "noDynamicNamespaceImportAccess": "warn" },
+      "style": {
+        "useImportType": "off",
+        "noDescendingSpecificity": "warn",
+        "noNonNullAssertion": "warn"
+      },
+      "suspicious": {
+        "noArrayIndexKey": "warn",
+        "noAssignInExpressions": "warn",
+        "noConfusingVoidType": "warn"
+      }
     }
   },
   "css": { "parser": { "tailwindDirectives": true } },

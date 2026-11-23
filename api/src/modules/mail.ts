@@ -85,22 +85,33 @@ export class OutboxWorker implements OnModuleInit, OnModuleDestroy {
       if (!locked.length) return;
       const email = await tx.outboundEmail.findUniqueOrThrow({ where: { id } });
       const attachments: { name: string; bytes: number; sha256: string }[] = [];
-      const needsPdf = ["invoice", "correction", "reminder", "test"].includes(email.kind) && email.versionId;
+      const needsPdf =
+        ["invoice", "correction", "reminder", "test"].includes(email.kind) && email.versionId;
       try {
         if (needsPdf && email.versionId) {
           const version = await tx.invoiceVersion.findUniqueOrThrow({
             where: { id: email.versionId },
-            include: { invoice: { select: { number: true } }, file: { select: { sha256: true, bytes: true } } },
+            include: {
+              invoice: { select: { number: true } },
+              file: { select: { sha256: true, bytes: true } },
+            },
           });
           let file = version.file;
           if (email.kind === "test") {
             const bytes = await this.pdf.renderVersion(email.versionId, { watermark: true });
-            file = { sha256: createHash("sha256").update(bytes).digest("hex"), bytes: bytes.length };
+            file = {
+              sha256: createHash("sha256").update(bytes).digest("hex"),
+              bytes: bytes.length,
+            };
           } else if (!file) {
             // Wait for invoice.render (state waiting_for_pdf).
             await tx.outboundEmail.update({
               where: { id },
-              data: { status: "waiting_for_pdf", attempts: { increment: 1 }, lastError: "Waiting for the PDF" },
+              data: {
+                status: "waiting_for_pdf",
+                attempts: { increment: 1 },
+                lastError: "Waiting for the PDF",
+              },
             });
             if (email.attempts + 1 >= MAX_ATTEMPTS * 6) throw new Error("PDF was not rendered");
             return;
@@ -133,23 +144,44 @@ export class OutboxWorker implements OnModuleInit, OnModuleDestroy {
         }
         await tx.outboundEmail.update({
           where: { id },
-          data: { status: "sent", sentAt: new Date(), transport: env.MAIL_TRANSPORT, messageId, attachments, lastError: null },
+          data: {
+            status: "sent",
+            sentAt: new Date(),
+            transport: env.MAIL_TRANSPORT,
+            messageId,
+            attachments,
+            lastError: null,
+          },
         });
       } catch (e) {
         const attempts = email.attempts + 1;
         const failed = attempts >= MAX_ATTEMPTS || String(e).includes("PDF was not rendered");
         await tx.outboundEmail.update({
           where: { id },
-          data: { status: failed ? "failed" : "queued", attempts, lastError: String(e).slice(0, 500) },
+          data: {
+            status: failed ? "failed" : "queued",
+            attempts,
+            lastError: String(e).slice(0, 500),
+          },
         });
         if (failed && email.invoiceId) {
           await tx.invoiceActivity.create({
-            data: { invoiceId: email.invoiceId, kind: "email_failed", actor: "system", data: { emailId: id, error: String(e).slice(0, 200) } },
+            data: {
+              invoiceId: email.invoiceId,
+              kind: "email_failed",
+              actor: "system",
+              data: { emailId: id, error: String(e).slice(0, 200) },
+            },
           });
         }
       }
       if (email.invoiceId) {
-        await this.events.emit(tx, { ws: email.workspaceId, topic: "invoice", action: "email", entity: email.invoiceId });
+        await this.events.emit(tx, {
+          ws: email.workspaceId,
+          topic: "invoice",
+          action: "email",
+          entity: email.invoiceId,
+        });
       }
     });
   }
