@@ -51,7 +51,7 @@ elif [ -z "$(env_get PAYPURE_SLOT)" ]; then
   done
   [ -n "$slot" ] || die "no free compose slot (1-99); prune old worktrees"
   base=$((20000 + slot * 10))
-  name=$(basename "$(wt_root)" | tr '[:upper:]' '[:lower:]' | tr -c 'a-z0-9_-\n' '-')
+  name=$(basename "$(wt_root)" | tr '[:upper:]' '[:lower:]' | tr -c 'a-z0-9_\n-' '-')
   cat >.env <<EOF
 $ENV_MARKER (worktree stack config; gitignored)
 PAYPURE_SLOT=$slot
