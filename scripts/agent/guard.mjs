@@ -22,6 +22,10 @@ import { homedir } from "node:os";
 import { basename, dirname, isAbsolute, join, normalize } from "node:path";
 
 const UNLOCK = process.env.PAYPURE_PRIMARY === "1";
+// Never let an inherited GIT_DIR (e.g. inside a git hook) answer for another path.
+const GIT_ENV = Object.fromEntries(
+  Object.entries(process.env).filter(([k]) => !k.startsWith("GIT_")),
+);
 
 const GIT_WRITES = new Set([
   "add",
@@ -153,7 +157,7 @@ function isPrimary(path) {
         "--git-common-dir",
         "--is-bare-repository",
       ],
-      { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], timeout: 4000 },
+      { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], timeout: 4000, env: GIT_ENV },
     ).split("\n");
     if (out[2]?.trim() !== "true" && out[0] && out[1]) {
       res = realpathSync(out[0].trim()) === realpathSync(out[1].trim());

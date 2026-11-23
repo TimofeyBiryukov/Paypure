@@ -18,7 +18,9 @@ while read -r _local_ref local_sha remote_ref _remote_sha; do
   [ "$local_sha" = "$stamp" ] && continue
   if [ "$local_sha" = "$(git rev-parse HEAD)" ] && [ -z "$(git status --porcelain)" ]; then
     say "[pre-push] ${local_sha:0:7} has not passed the gate yet; running it"
-    bash scripts/agent/check.sh || die "[pre-push] gate failed; push refused"
+    # git exports GIT_DIR & co. to hooks; the gate must not inherit them.
+    env $(env | sed -n 's/^\(GIT_[A-Z_]*\)=.*/-u \1/p') bash scripts/agent/check.sh </dev/null ||
+      die "[pre-push] gate failed; push refused"
   else
     die "[pre-push] ${local_sha:0:7} has not passed scripts/agent/check.sh.
 Check out that commit with a clean tree and run the gate, then push."

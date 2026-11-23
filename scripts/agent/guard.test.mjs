@@ -7,10 +7,15 @@ import { join } from "node:path";
 import { after, test } from "node:test";
 
 const GUARD = new URL("./guard.mjs", import.meta.url).pathname;
+// Git hooks export GIT_DIR & co. Inherited, they would point the throwaway repo
+// below at the real one (this happened once: it set core.bare=true).
+const cleanEnv = Object.fromEntries(
+  Object.entries(process.env).filter(([k]) => !k.startsWith("GIT_")),
+);
 const tmp = mkdtempSync(join(tmpdir(), "guard-test-"));
 const primary = join(tmp, "repo");
 const wt = join(primary, ".claude/worktrees/t");
-const git = (...a) => execFileSync("git", a, { stdio: "ignore" });
+const git = (...a) => execFileSync("git", a, { stdio: "ignore", env: cleanEnv });
 git("init", "-q", "-b", "main", primary);
 git(
   "-C",
@@ -32,7 +37,7 @@ function run(payload, env = {}) {
   const r = spawnSync("node", [GUARD], {
     input: JSON.stringify(payload),
     encoding: "utf8",
-    env: { ...process.env, PAYPURE_PRIMARY: "", ...env },
+    env: { ...cleanEnv, PAYPURE_PRIMARY: "", ...env },
   });
   return r.stdout ? JSON.parse(r.stdout) : null;
 }
@@ -119,6 +124,6 @@ test("cursor protocol", () => {
   assert.equal(run({ command: "git status", cwd: primary }).permission, "allow");
 });
 test("garbage input fails open", () => {
-  const r = spawnSync("node", [GUARD], { input: "not json", encoding: "utf8" });
+  const r = spawnSync("node", [GUARD], { input: "not json", encoding: "utf8", env: cleanEnv });
   assert.equal(r.status, 0);
 });
