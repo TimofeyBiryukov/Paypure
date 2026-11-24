@@ -296,13 +296,16 @@ was deliberate.
 | Running, no task | `Choose task…` in the warning colour and the clock |
 | Paused | The dot stops pulsing and the time is muted. Shows `⏵` resume and `■` |
 | Long-running (> 10h) | Warning colour: `Running 11h · still working?` with a link to edit the start. Never auto-stops |
+| Several live | Shows the newest **running** timer (the newest paused one if none run) plus a count chip `+2` before the controls. `⏵`/`■` act on the timer shown. The chip stays on mobile, where the task is hidden. Any long-running timer turns the pill to the warning colour |
 
 Stopping a timer that has no task pauses it and opens the task picker ("Choose a task to log 1:24"),
 because a stopped entry always has a task (06 §2.7).
 
 Clicking the pill body opens the **timer popover**: task (changeable), note (autosaves), billable
 toggle, *Started at* (editable, with ±5/15/30/60 min nudges and "end of last entry"), and Discard
-(with undo).
+(with undo). With several live timers it lists them (one row each, with its own clock, pause/resume
+and stop) and expands one at a time into those details. `+ Start another timer` sits at the bottom
+(S4, 06 §2.4).
 
 ### 5.13 Invoice sheet
 
@@ -427,7 +430,7 @@ with a legend and hover totals) · Command palette.
    error with a toast.
 7. **Live sync.** Timers and entries sync across tabs and devices over server-sent events
    ([06 §4](06-time-and-timers.md#4-live-sync)). A timer started on
-   the phone shows up in the desktop top bar within a second.
+   the phone shows up in the desktop top bar within a second, next to the ones already running.
 
 ---
 

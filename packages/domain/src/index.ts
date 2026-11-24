@@ -8,3 +8,4 @@ export * from "./numbering";
 export * from "./invoice";
 export * from "./sheet";
 export * from "./schemas";
+export * from "./note";

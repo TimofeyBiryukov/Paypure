@@ -3,9 +3,9 @@ import {
   formatHundredths,
   formatMoney,
   formatPercentBp,
-  parseNote,
   type SheetData,
 } from "@paypure/domain";
+import { NoteMarkdown } from "./note-md";
 
 /**
  * The invoice sheet (Guide §5.13): one component for the editor preview, the invoice page, the
@@ -197,24 +197,5 @@ export function InvoiceSheet({ s, scale }: { s: SheetData; scale?: number }) {
 }
 
 function SheetNote({ text }: { text: string }) {
-  return (
-    <div className="text-[12px] leading-4 text-[#5F5B54] mt-1 note-md">
-      {parseNote(text).map((b, i) =>
-        b.type === "p" ? (
-          // biome-ignore lint/suspicious/noArrayIndexKey: static render
-          <p key={i} className="whitespace-pre-line">
-            {b.text}
-          </p>
-        ) : (
-          // biome-ignore lint/suspicious/noArrayIndexKey: static render
-          <ul key={i}>
-            {b.items.map((it, j) => (
-              // biome-ignore lint/suspicious/noArrayIndexKey: static render
-              <li key={j}>{it}</li>
-            ))}
-          </ul>
-        ),
-      )}
-    </div>
-  );
+  return <NoteMarkdown text={text} print className="text-[12px] leading-4 text-[#5F5B54] mt-1" />;
 }

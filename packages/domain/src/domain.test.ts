@@ -3,6 +3,7 @@ import {
   buildFixedLine,
   buildTimeLines,
   computeInvoice,
+  coveredSeconds,
   displayStatus,
   formatInvoiceNumber,
   formatMoney,
@@ -196,5 +197,18 @@ describe("fixed line", () => {
     expect(buildFixedLine({ ...common, remainingMinor: 120000, amountMinor: 60000 }).detail).toBe(
       "Part of €1,200.00 fixed fee · €600.00 remaining after this invoice",
     );
+  });
+});
+
+describe("parallel timers (06 §2.10)", () => {
+  const iv = (a: string, b: string) => ({ startedAt: `2026-11-23T${a}:00Z`, endedAt: `2026-11-23T${b}:00Z` });
+  it("counts overlapping time once", () => {
+    expect(coveredSeconds([iv("10:00", "11:00"), iv("10:00", "11:00")])).toBe(3600);
+    expect(coveredSeconds([iv("10:00", "11:00"), iv("10:30", "12:00")])).toBe(7200);
+  });
+  it("adds disjoint and nested intervals", () => {
+    expect(coveredSeconds([iv("13:00", "14:00"), iv("09:00", "10:00")])).toBe(7200);
+    expect(coveredSeconds([iv("09:00", "12:00"), iv("10:00", "11:00")])).toBe(10800);
+    expect(coveredSeconds([])).toBe(0);
   });
 });

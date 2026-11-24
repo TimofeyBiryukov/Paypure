@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
+import Script from "next/script";
 import "./globals.css";
 
 // Latin + Cyrillic: client names and bank details include Cyrillic (Guide §3).
@@ -17,11 +18,13 @@ const tzScript = `(function(){try{var z=Intl.DateTimeFormat().resolvedOptions().
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={inter.variable} suppressHydrationWarning>
-      <head>
-        {/* biome-ignore lint/security/noDangerouslySetInnerHtml: tiny inline bootstrap script */}
-        <script dangerouslySetInnerHTML={{ __html: tzScript }} />
-      </head>
-      <body>{children}</body>
+      <body>
+        {/* beforeInteractive: Next injects it into the initial HTML; a raw <script> trips React 19. */}
+        <Script id="tz-bootstrap" strategy="beforeInteractive">
+          {tzScript}
+        </Script>
+        {children}
+      </body>
     </html>
   );
 }

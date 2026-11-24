@@ -21,14 +21,15 @@ export function LiveSync() {
       clearTimeout(timer);
       timer = setTimeout(() => router.refresh(), 300);
     };
-    const apply = (ev: { topic?: string; timer?: unknown; type?: string }) => {
+    const apply = (ev: { topic?: string; entity?: string; timer?: unknown; type?: string }) => {
       if (ev.type === "resync") return refresh();
       if (ev.type === "session") {
         window.location.href = "/login";
         return;
       }
       if (ev.topic === "timer") {
-        window.dispatchEvent(new CustomEvent("pp:timer", { detail: ev.timer ?? null }));
+        // Timers run in parallel: each event updates one of them, by entry id (06 §4.3).
+        window.dispatchEvent(new CustomEvent("pp:timer", { detail: { id: ev.entity, timer: ev.timer ?? null } }));
         return;
       }
       if (ev.topic) refresh();

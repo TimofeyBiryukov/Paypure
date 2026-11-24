@@ -164,7 +164,22 @@ dialog::backdrop { background: rgb(0 0 0 / .25); }
 .gap-row { border: 1px dashed var(--border-strong); border-radius: var(--radius-md); color: var(--text-muted); }
 .hatched { background-image: repeating-linear-gradient(45deg, var(--border) 0 4px, transparent 4px 8px); }
 .badge { display: inline-flex; align-items: center; justify-content: center; color: #fff; border-radius: 4px; font-size: 11px; font-weight: 600; flex: none; }
+.note-md { overflow-wrap: anywhere; }
+.note-md p, .note-md li { white-space: pre-line; }
+.note-md > * + * { margin-top: 4px; }
 .note-md ul { list-style: disc; padding-left: 18px; }
-.note-md p + p, .note-md p + ul, .note-md ul + p { margin-top: 4px; }
+.note-md ol { list-style: decimal; padding-left: 22px; }
+.note-md li > ul { list-style: circle; }
+.note-md li > ul li > ul { list-style: square; }
+.note-md li > ul, .note-md li > ol { margin-top: 1px; }
+.note-md li::marker { font-variant-numeric: tabular-nums; }
+.note-md .note-h { font-weight: 600; color: inherit; }
+.note-md strong { font-weight: 600; }
+.note-md em { font-style: italic; }
+.note-md del { text-decoration: line-through; }
+.note-md code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .92em; padding: 0 3px; border-radius: 3px; background: rgb(127 127 127 / .14); white-space: pre-wrap; }
+.note-md a { color: var(--accent); text-decoration: underline; text-underline-offset: 2px; }
+.invoice-sheet .note-md a { color: inherit; }
+.note-md .note-url { color: inherit; opacity: .8; }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 }

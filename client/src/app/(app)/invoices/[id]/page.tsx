@@ -34,7 +34,8 @@ interface Inv {
   status: "draft" | "issued" | "void";
   source: "paypure" | "paydirt";
   currency: string;
-  publicUrl: string;
+  /** null when public invoice pages are off (PUBLIC_INVOICE_LINKS). */
+  publicUrl: string | null;
   client: { id: string; name: string; colour: number; billingEmails: string[] };
   display: { key: string; label: string; tone: ChipTone; balanceMinor: number; overpaidMinor?: number; overdueDays?: number };
   totalMinor: number;
@@ -148,7 +149,7 @@ export default async function InvoicePage({ params, searchParams }: { params: Pr
                 <a href={`/invoices/${inv.id}/pdf`} className="btn btn-secondary" target="_blank" rel="noreferrer">
                   <FileDown size={14} /> PDF
                 </a>
-                <CopyButton text={inv.publicUrl} label="Copy link" />
+                {inv.publicUrl && <CopyButton text={inv.publicUrl} label="Copy link" />}
               </>
             )}
             {inv.display.key === "overdue" && !correction && (
@@ -201,7 +202,7 @@ export default async function InvoicePage({ params, searchParams }: { params: Pr
                     View billed time
                   </Link>
                 )}
-                {!isDraft && (
+                {!isDraft && inv.publicUrl && (
                   <ActionForm action={regenerateLink}>
                     {hidden}
                     <button type="submit" className="menu-item">

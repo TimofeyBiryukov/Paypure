@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { startTimer } from "@/app/actions/timer";
 import type { ActionState } from "@/lib/action";
-import type { Catalog } from "@/lib/types";
+import type { Catalog, TimerResult } from "@/lib/types";
 import { useToast } from "./toaster";
 import { ClientBadge } from "./ui";
 
@@ -106,7 +106,10 @@ export function Palette({ catalog, isAdmin }: { catalog: Catalog; isAdmin: boole
     const r: ActionState = await startTimer(null, fd);
     setOpen(false);
     if (r?.ok) {
-      window.dispatchEvent(new CustomEvent("pp:timer", { detail: (r.data as { timer?: unknown })?.timer ?? null }));
+      const t = r.data as TimerResult | undefined;
+      for (const u of t?.updates ?? []) window.dispatchEvent(new CustomEvent("pp:timer", { detail: u }));
+      // Already running on that task: open the popover on it (06 §2.4)
+      if (t?.existing && t.focus) window.dispatchEvent(new CustomEvent("pp:timer-focus", { detail: t.focus }));
       if (r.toast) push(r.toast);
     } else if (r?.error) push({ text: r.error, tone: "danger" });
   };

@@ -15,6 +15,7 @@ import * as argon2 from "argon2";
 import { AdminOnly, C, type Ctx, hashToken, newToken } from "../common/auth";
 import { conflict, invalid, notFound } from "../common/errors";
 import { parse } from "../common/zod";
+import { env } from "../env";
 import { PrismaService, type Tx } from "../prisma.service";
 import { DEFAULT_TEMPLATES } from "./invoice-ops";
 
@@ -56,6 +57,7 @@ export class SettingsController {
         return { kind: k, subject: t?.subject ?? DEFAULT_TEMPLATES[k].subject, body: t?.body ?? DEFAULT_TEMPLATES[k].body };
       }),
       numbering: await this.nextNumber(this.prisma, ctx),
+      publicLinks: env.PUBLIC_INVOICE_LINKS,
     };
   }
 

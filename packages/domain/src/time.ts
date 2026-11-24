@@ -139,3 +139,29 @@ export function formatDateRange(from: CalendarDate, to: CalendarDate): string {
   if (a.m === b.m) return `${a.d}–${b.d} ${MONTHS[b.m - 1]}`;
   return `${formatDayMonth(from)}–${formatDayMonth(to)}`;
 }
+
+/** How many timers one member may have live (running or paused) at once (06 §2.4). */
+export const TIMER_LIMIT = 5;
+
+/**
+ * Seconds covered by a set of intervals, counting each moment once. With parallel timers a
+ * day's Σ duration can exceed this "on the clock" time (06 §2.10). Bounds are ISO instants.
+ */
+export function coveredSeconds(intervals: { startedAt: string; endedAt: string }[]): number {
+  const spans = intervals
+    .map((i) => [Date.parse(i.startedAt), Date.parse(i.endedAt)] as const)
+    .filter(([a, b]) => b > a)
+    .sort((x, y) => x[0] - y[0]);
+  let total = 0;
+  let from = Number.NaN;
+  let to = Number.NaN;
+  for (const [a, b] of spans) {
+    if (Number.isNaN(to) || a > to) {
+      if (!Number.isNaN(to)) total += to - from;
+      from = a;
+      to = b;
+    } else if (b > to) to = b;
+  }
+  if (!Number.isNaN(to)) total += to - from;
+  return Math.round(total / 1000);
+}

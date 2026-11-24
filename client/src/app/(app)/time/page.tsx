@@ -1,4 +1,4 @@
-import { addDays, formatDateShort, formatDuration, formatHoursMinutes, formatMoney, startOfWeek, sumByCurrency, todayIn, toLocalTime } from "@paypure/domain";
+import { addDays, coveredSeconds, formatDateShort, formatDuration, formatHoursMinutes, formatMoney, startOfWeek, sumByCurrency, todayIn, toLocalTime } from "@paypure/domain";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { bulkTime } from "@/app/actions/time";
@@ -211,7 +211,7 @@ export default async function TimePage({ searchParams }: { searchParams: Promise
               <section key={d}>
                 <h2 className="sticky top-14 z-10 bg-bg py-2 flex items-baseline justify-between border-b border-line">
                   <span className="t-title-3">{d === today ? `Today · ${formatDateShort(d)}` : formatDateShort(d)}</span>
-                  <span className="tnum font-semibold">{formatHoursMinutes(es.reduce((s, e) => s + e.durationSeconds, 0))}</span>
+                  <DayTotal entries={es} />
                 </h2>
                 <ul className="divide-y divide-[var(--border)]">
                   {rows.map((r) =>
@@ -307,5 +307,22 @@ export default async function TimePage({ searchParams }: { searchParams: Promise
         <p className="t-caption mt-6">Values use the current rates: {unbilled.map((u) => formatMoney(u)).join(" · ")}.</p>
       )}
     </div>
+  );
+}
+
+/**
+ * Day total = Σ duration. With parallel timers entries overlap, so it also shows the time the
+ * day's segments cover, counting each moment once, when that differs (06 §2.10).
+ */
+function DayTotal({ entries }: { entries: EntryRow[] }) {
+  const total = entries.reduce((s, e) => s + e.durationSeconds, 0);
+  const closed = entries.flatMap((e) => e.segments.filter((g) => g.endedAt) as { startedAt: string; endedAt: string }[]);
+  const untimed = entries.filter((e) => !e.startedAt).reduce((s, e) => s + e.durationSeconds, 0);
+  const clock = coveredSeconds(closed) + untimed;
+  return (
+    <span className="tnum">
+      <span className="font-semibold">{formatHoursMinutes(total)}</span>
+      {clock < total && <span className="text-muted text-sm"> · {formatHoursMinutes(clock)} on the clock</span>}
+    </span>
   );
 }

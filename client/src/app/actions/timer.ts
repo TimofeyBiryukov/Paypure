@@ -3,14 +3,20 @@
 import { formatDuration } from "@paypure/domain";
 import { revalidatePath } from "next/cache";
 import { type ActionState, run, str } from "@/lib/action";
-import type { TimerSnapshot } from "@/lib/types";
-import { api } from "@/server/api";
+import type { TimerResult, TimerSnapshot } from "@/lib/types";
+import { ApiError, api } from "@/server/api";
 
-type Snap = { entry: TimerSnapshot | null; applied: boolean; needsTask?: boolean; newDay?: boolean; stopped?: { id: string; seconds: number; prevState: string }; stoppedEntryId?: string | null; stoppedPrevState?: string | null };
+type Snap = { entry: TimerSnapshot | null; applied: boolean; existing?: boolean; needsTask?: boolean; newDay?: boolean; previousEntryId?: string; stopped?: { id: string; seconds: number; prevState: string } };
 
 const label = (e: TimerSnapshot | null) => (e?.task ? `${e.task.clientName} · ${e.task.name}` : "");
+/** One entry changed. */
+const one = (id: string, timer: TimerSnapshot | null, extra: Omit<TimerResult, "updates"> = {}): TimerResult => ({ updates: [{ id, timer }], ...extra });
 
-/** Timer actions (06 §2.4). Each is a real <form> with a hidden entry id (Guide §7.1). */
+/**
+ * Timer actions (06 §2.4). Each is a real <form> with a hidden entry id (Guide §7.1). Timers run
+ * in parallel, so every result lists the entries it changed (`TimerResult`) and the client
+ * updates just those.
+ */
 export async function startTimer(_: ActionState, fd: FormData): Promise<ActionState> {
   return run(async () => {
     const taskId = str(fd, "taskId") || null;
@@ -20,16 +26,18 @@ export async function startTimer(_: ActionState, fd: FormData): Promise<ActionSt
     else if (when) body.offsetSeconds = Number(when) * 60;
     const note = str(fd, "note");
     if (note) body.note = note;
-    const r = await api<Snap>("/v1/timer/start", { body });
+    let r: Snap;
+    try {
+      r = await api<Snap>("/v1/timer/start", { body });
+    } catch (e) {
+      // Shown as a toast: the ⏵ buttons on task rows have no room for an inline error.
+      if (e instanceof ApiError && e.code === "timer_limit") return { toast: { text: e.message, tone: "danger" } };
+      throw e;
+    }
     revalidatePath("/", "layout");
     return {
-      data: { timer: r.entry },
-      toast: r.stoppedEntryId
-        ? {
-            text: `Stopped the previous timer. Started ${label(r.entry) || "a timer"}`,
-            undo: { action: "restoreTimer", payload: { id: r.stoppedEntryId, state: r.stoppedPrevState ?? "running", discardId: r.entry?.id ?? "" } },
-          }
-        : undefined,
+      data: r.entry ? { ...one(r.entry.id, r.entry, { focus: r.entry.id, existing: !!r.existing }) } : undefined,
+      toast: r.existing ? { text: `Already running: ${label(r.entry)}` } : undefined,
     };
   });
 }
@@ -42,14 +50,14 @@ export async function timerTransition(_: ActionState, fd: FormData): Promise<Act
     const r = await api<Snap>(`/v1/timer/${id}/${op}`, { body: {} });
     revalidatePath("/", "layout");
     if (!r.applied) {
-      return { data: { timer: r.entry }, toast: { text: r.entry ? `Already ${r.entry.state} on another device` : "Already stopped on another device" } };
+      return { data: { ...one(id, r.entry) }, toast: { text: r.entry ? `Already ${r.entry.state} on another device` : "Already stopped on another device" } };
     }
     if (op === "stop" && r.needsTask) {
-      return { data: { timer: r.entry, needsTask: true } };
+      return { data: { ...one(id, r.entry, { needsTask: id }) } };
     }
     if (op === "stop" && r.stopped) {
       return {
-        data: { timer: null },
+        data: { ...one(id, null) },
         toast: {
           text: `Logged ${formatDuration(r.stopped.seconds, { withSeconds: r.stopped.seconds < 60 })}`,
           undo: { action: "restoreTimer", payload: { id: r.stopped.id, state: r.stopped.prevState } },
@@ -58,12 +66,17 @@ export async function timerTransition(_: ActionState, fd: FormData): Promise<Act
       };
     }
     if (op === "discard") {
-      return { data: { timer: null }, toast: { text: "Timer discarded", undo: { action: "restoreTimer", payload: { id } } } };
+      return { data: { ...one(id, null) }, toast: { text: "Timer discarded", undo: { action: "restoreTimer", payload: { id } } } };
     }
     if (op === "resume" && r.newDay) {
-      return { data: { timer: r.entry }, toast: { text: "Started a new entry for today. Yesterday's entry was kept." } };
+      // Yesterday's entry stopped and a new one started on the same task (06 §2.6).
+      const result: TimerResult = { updates: [{ id, timer: null }, ...(r.entry ? [{ id: r.entry.id, timer: r.entry }] : [])], focus: r.entry?.id };
+      return {
+        data: { ...result },
+        toast: { text: "Started a new entry for today. Yesterday's entry was kept." },
+      };
     }
-    return { data: { timer: r.entry } };
+    return { data: { ...one(id, r.entry) } };
   });
 }
 
@@ -85,11 +98,11 @@ export async function updateTimer(_: ActionState, fd: FormData): Promise<ActionS
       const s = await api<Snap>(`/v1/timer/${id}/stop`, { body: {} });
       revalidatePath("/", "layout");
       return {
-        data: { timer: null },
+        data: { ...one(id, null) },
         toast: s.stopped ? { text: `Logged ${formatDuration(s.stopped.seconds)}`, undo: { action: "restoreTimer", payload: { id, state: "paused" } } } : undefined,
       };
     }
     revalidatePath("/", "layout");
-    return { data: { timer: r.entry } };
+    return { data: { ...one(id, r.entry) } };
   });
 }

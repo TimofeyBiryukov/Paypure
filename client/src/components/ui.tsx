@@ -1,4 +1,5 @@
-import { type ChipTone, formatMoney, type Money as M, parseNote } from "@paypure/domain";
+import { type ChipTone, formatMoney, type Money as M } from "@paypure/domain";
+import { NoteMarkdown } from "./note-md";
 import Link from "next/link";
 
 export function StatusChip({ label, tone, note }: { label: string; tone: ChipTone; note?: string }) {
@@ -133,27 +134,7 @@ export function Empty({ children, action }: { children: React.ReactNode; action?
 
 /** Light Markdown subset for notes (Guide §5.13). */
 export function Note({ text, className = "" }: { text: string; className?: string }) {
-  const blocks = parseNote(text);
-  return (
-    <div className={`note-md ${className}`}>
-      {blocks.map((b, i) =>
-        b.type === "p" ? (
-          // biome-ignore lint/suspicious/noArrayIndexKey: static render
-          <p key={i} className="whitespace-pre-line">
-            {b.text}
-          </p>
-        ) : (
-          // biome-ignore lint/suspicious/noArrayIndexKey: static render
-          <ul key={i}>
-            {b.items.map((it, j) => (
-              // biome-ignore lint/suspicious/noArrayIndexKey: static render
-              <li key={j}>{it}</li>
-            ))}
-          </ul>
-        ),
-      )}
-    </div>
-  );
+  return <NoteMarkdown text={text} className={className} />;
 }
 
 export function Progress({ value, max }: { value: number; max: number }) {

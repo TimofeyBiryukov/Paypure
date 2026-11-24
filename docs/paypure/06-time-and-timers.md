@@ -14,7 +14,7 @@ This is the reference for the `time_entries` tables, the timer service and the `
 | Topic | Rule |
 |---|---|
 | Pauses | A timed entry is a list of **segments** (worked intervals). A pause is the space between two segments. Duration = sum of segments, never `end − start` |
-| Timer | A time entry in state `running` or `paused`. One live (running **or** paused) entry per member |
+| Timer | A time entry in state `running` or `paused`. A member can have **several live timers in parallel** (up to 5, at most one per task). Starting one never stops another. Overlapping time counts in full on each entry |
 | No task | Allowed only while the timer is live. Stopping requires a task |
 | Instants | `timestamptz`, UTC, truncated to the second. ISO strings with `Z` over the wire |
 | Calendar dates | `date` columns, `YYYY-MM-DD` strings. Never turned into a JS `Date` |
@@ -73,8 +73,10 @@ time_entry_segments
 Constraints (in the migration, edited after `prisma migrate dev --create-only`):
 
 ```sql
--- One live timer per member (running or paused)
-CREATE UNIQUE INDEX one_live_timer ON time_entries (member_id)
+-- Parallel timers: at most one live entry (running or paused) per member and task.
+-- Task-less live entries aren't covered (NULLs are distinct). The limit of 5 live entries
+-- per member is checked by the service under a per-member lock (§2.8)
+CREATE UNIQUE INDEX one_live_timer_per_task ON time_entries (member_id, task_id)
   WHERE state <> 'stopped' AND deleted_at IS NULL;
 
 -- A stopped entry has a task. Only stopped entries can be billed or taken off unbilled
@@ -120,15 +122,26 @@ three at commit and rejects the transaction otherwise.
 
 | Action | From | Effect (one transaction, server time `now()` unless stated) |
 |---|---|---|
-| **Start** | — | Stops the member's live entry first (row below). Inserts the entry (`state = running`, `time_zone`, `date`) and one open segment from `now()`, or from `now() − offset` for *Start N min ago*, or from the end of the last entry |
+| **Start** | — | Never touches the member's other live entries. Inserts the entry (`state = running`, `time_zone`, `date`) and one open segment from `now()`, or from `now() − offset` for *Start N min ago*, or from the end of the last entry. If a live entry on the same task already exists, nothing is inserted and that entry is returned with `applied: false, existing: true` (the popover focuses it). With 5 live entries already, it is refused with `timer_limit` |
 | **Pause** | running | Closes the open segment at `now()`. `state = paused`. Adds the segment to `duration_seconds` |
 | **Resume** | paused | Inserts an open segment from `now()`. `state = running`. If the local date changed since the last segment ended, see §2.6 |
 | **Stop** | running / paused | Running: closes the open segment at `now()`. Paused: nothing to close, the entry ends where the last segment ended (paused time is never counted). Sets `started_at`, `ended_at`, `duration_seconds`, `state = stopped`. Needs a task (§2.7) |
 | **Discard** | running / paused | Sets `deleted_at`. Undo clears it |
-| **Start another** | running / paused | Stops the live entry as above, then starts the new one, in one transaction. The undo toast restores the old entry to its previous state and discards the new one |
 
-Paused timers count as live. Starting another timer stops a paused one, the same as a running one,
-so a member never has two half-finished timers.
+**Parallel timers.** Every row above acts on one entry, named by its id, and never on the member's
+other timers. A member can work for several clients at once (a long render for Acme while
+designing for Globex), so each live timer runs, pauses and stops on its own, and each logs its
+full worked time: two timers running 10:00–11:00 log 1:00 each. Time is not split between
+them. Paused timers count as live too, so they take a place in the limit and keep their task.
+
+- **One per task.** A second timer on the same task would only double-count one piece of work, so
+  starting a task that is already live opens that timer instead (Paydirt also ignored it).
+- **Limit of 5.** Timers left running by mistake are the main risk of parallel timers. The limit
+  stops a pile-up, and the pill always shows how many are live (Guide §5.12). Starting a sixth
+  says "You have 5 timers live. Stop one first."
+- **Switching task** means stopping one timer and starting another, two actions. Changing the task
+  of the running timer (popover) is still the one-step way to correct a timer started on the
+  wrong task.
 
 **Very short entries.** Stopping an entry under 60 seconds still saves it, and the toast says
 "Logged 0:00:42 · Undo". Nothing is dropped silently.
@@ -143,8 +156,8 @@ Undo for entries (delete, discard, auto-stop) is a soft delete: `deleted_at` is 
 action clears it. A daily job purges rows deleted more than 24 hours ago, except entries referenced by any
 `invoice_line_entries` row (a frozen version still points at them): those stay soft-deleted for
 ever. Every query filters
-`deleted_at IS NULL`. Restoring a discarded timer fails with a toast if the member has started
-another one since, because of the `one_live_timer` index.
+`deleted_at IS NULL`. Restoring a discarded or stopped timer fails with a toast if the member has
+since started another timer on the same task (`one_live_timer_per_task`) or already has 5 live.
 
 ### 2.6 Midnight, overnight and travel
 
@@ -163,9 +176,9 @@ another one since, because of the `one_live_timer` index.
 - `task_id` may be NULL while the entry is `running` or `paused`. The check in §2.2 forbids NULL
   once it is stopped.
 - The pill shows `Choose task…` in the warning colour (Guide §5.12).
-- **Anything that would auto-stop a task-less timer** (Start another, Resume on a new day) is
-  refused with `needs_task`, and the popover asks first: "Choose a task for the running timer
-  (1:24) · or Discard". The new timer starts after that, in the same interaction.
+- **Resume on a new day** would auto-stop a task-less timer (§2.6), so it is refused with
+  `needs_task`, and the popover asks first: "Choose a task for yesterday's timer (1:24) · or
+  Discard". Starting another timer never stops anything, so it never needs this.
 - `billable` is stored as `true` while there's no task and is re-derived from the task's mode
   (07 §3) when a task is first set.
 - **Stop with no task**: the server pauses the timer, so no time accrues while choosing, and
@@ -185,10 +198,15 @@ another one since, because of the `one_live_timer` index.
 
   If no row is returned, the service reads the entry and returns its **current** state with
   `applied: false`. The client then shows the real state ("Already stopped on another device").
-- Every timer action names the entry (`entry_id`), not "the member's timer". A stale tab that
-  pauses an entry which has since stopped can't touch the new timer.
-- **Start** relies on `one_live_timer`. Two starts at once: the first commits, the second retries
-  once (it now sees a live entry and auto-stops it) and then succeeds.
+- Every timer action names the entry (`entry_id`), not "the member's timer". With parallel timers
+  there is no "the" timer, and a stale tab that pauses an entry which has since stopped can't
+  touch another one.
+- **Start** takes a per-member transaction lock (`pg_advisory_xact_lock`) before it looks for a
+  live entry on the task and counts the live entries. Two starts at once run one after the other:
+  two starts on the same task end with one timer (the second returns `existing`), and two starts
+  can't both pass the limit. `one_live_timer_per_task` backs this up for the other writers
+  (task change, restore), which return `task_live` when they would create a second live timer
+  on a task.
 - **Panel edits** (times, note, task) send the `version` they were loaded with. A mismatch returns
   `409`, and the panel shows "Changed on another device · Reload" and keeps what the user typed.
 - Transition times come from the **server clock** only. *Start N min ago* sends an offset, not a
@@ -221,19 +239,26 @@ as a correction ([08 §5](08-invoice-lifecycle.md#5-changes-to-billed-time-and-o
 - **Gap rows** are computed from **segments**, not from start/end. A gap is any interval of more
   than 5 minutes on the member's day that no segment covers and that isn't a break inside an
   entry (breaks were deliberate). Overlaps
-  between entries are allowed and shown with a small warning, never blocked.
+  between entries are allowed and never blocked. They are normal with parallel timers (§2.4).
+- **Day totals with overlaps.** A day total is still Σ `duration_seconds`, so two parallel hours
+  make 2:00. When entries overlap, the day header also shows the time the day's segments cover,
+  counting each moment once: `9:30 · 8:00 on the clock`. It only appears when the two differ.
 - **Invoices** use `duration_seconds` only. Break times never print. A per-entry line prints the
   date (Guide §5.13), not the range.
-- The builder (S9) lists **stopped** entries only. If the client has a live timer, it shows
-  "A timer is running on Acme (1:24). Stop it to include that time."
+- The builder (S9) lists **stopped** entries only. If the client has live timers, it shows
+  "A timer is running on Acme (Jane). Stop it to include that time.", or "2 timers are running
+  on Acme (Jane, Sam)…".
 
 ### 2.11 API
 
+`GET /v1/timer` returns `{entries: [snapshot…]}`, every live entry of the member, newest first ·
 `POST /v1/timer/start {task_id?, start: {offset_s} | {after_last_entry: true} | {at}, note?, billable?}`
 · `POST /v1/timer/{entry_id}/pause|resume|stop|discard` · `PATCH /v1/time-entries/{id}` with
-`version` and either `segments[]` or `duration_seconds`. Each returns the **timer snapshot**:
-`{entry_id, state, task, segments[], worked_seconds_closed, version, applied}`. The client clock
-renders `worked_seconds_closed + (now − open_segment.started_at)`.
+`version` and either `segments[]` or `duration_seconds`. Each returns the **timer snapshot** of
+the entry it acted on:
+`{entry_id, state, task, segments[], worked_seconds_closed, version, applied}` (start adds
+`existing`). The client keeps a list of snapshots keyed by entry id. Each clock renders
+`worked_seconds_closed + (now − open_segment.started_at)`.
 
 In the client each action is a real `<form>` with a hidden `entry_id` (Guide §7.1, single-button
 mutations).
@@ -375,7 +400,7 @@ tiny and needed for the 1-second target.
 
 | Topic | Emitted on | Delivered to | Client effect |
 |---|---|---|---|
-| `timer` | start, pause, resume, stop, discard, task/start edits | The member's own sessions | Replace the timer store from the snapshot. Pill and popover update with no fetch |
+| `timer` | start, pause, resume, stop, discard, task/start edits | The member's own sessions | `entity` is always the entry id. Upsert that entry in the timer store from the snapshot, or remove it when the snapshot is null or stopped. Pill and popover update with no fetch |
 | `time` | entry create/edit/delete/restore, bulk actions, take off unbilled | The member + Admins | Refresh if on Time, Home, a project's Time tab or the builder |
 | `catalog` | client/project/task create, edit, archive | Everyone in the workspace | Refresh the ⌘K list. Refresh the current page if it shows that entity |
 | `invoice` | draft change, send, payment, void, viewed | Admins | Refresh Invoices, the invoice page, Home, the client page |
@@ -444,7 +469,7 @@ milliseconds on one host, well inside the 1-second target.
 |---|---|---|
 | TT1 | Entries are made of segments. Pauses are the space between them | Split entries per pause, or a table of pause intervals |
 | TT2 | `duration_seconds` is the only source for totals and invoices | Computing `end − start` where needed |
-| TT3 | A paused timer counts as live. Starting another one stops it | Allowing a paused timer beside a running one |
+| TT3 | Parallel timers: up to 5 live (running or paused) per member, one per task. Starting a timer never stops another. Overlapping time counts in full on each entry, and day headers add "on the clock" time | One live timer per member that a new start stops (v0.1). Splitting overlapping time between the running timers. Switching by default with "start alongside" on request |
 | TT4 | Resuming on a new local day starts a new entry | Keeping one entry that spans days of work |
 | TT5 | `task_id` is nullable only while live. Stop asks for a task and pauses meanwhile | Requiring a task to start, or allowing stopped entries without a task |
 | TT6 | Guarded, idempotent transitions on server time, plus `version` for edits | Last write wins, or client-supplied timestamps |
@@ -461,8 +486,9 @@ milliseconds on one host, well inside the 1-second target.
 ## 6. Left to implementation
 
 - The exact gap threshold and how gap rows behave on a travel day with entries in two zones.
-- Whether overlapping entries of one member should ever be blocked. v1 only warns. The
-  exclusion constraint covers segments within one entry, not across entries.
+- Whether the builder should flag billable time that overlaps time billed to another client.
+  Parallel timers make this common and intended, so v1 doesn't. The exclusion constraint covers
+  segments within one entry, not across entries.
 - The route-pattern map for `router.refresh()` and the debounce value.
 - The ambiguous-time switch UI in the smart time input.
 - Whether a member's "no time logged today" reminder exists (it would use the member zone).

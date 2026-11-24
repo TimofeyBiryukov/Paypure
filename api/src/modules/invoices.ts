@@ -26,6 +26,7 @@ import { AdminOnly, C, type Ctx } from "../common/auth";
 import { d2s, s2d } from "../common/dates";
 import { ApiError, conflict, invalid, notFound } from "../common/errors";
 import { parse } from "../common/zod";
+import { env } from "../env";
 import { Prisma, PrismaService, type Tx } from "../prisma.service";
 import { BillingService } from "./billing";
 import { EventsService } from "./events";
@@ -48,6 +49,7 @@ import {
   regenerateLines,
   resolveAccount,
   versionInclude,
+  withoutLinkLines,
   writeTotals,
 } from "./invoice-ops";
 import { PdfService } from "./pdf";
@@ -152,9 +154,10 @@ export class InvoicesController {
       where: { taskId: { in: fixedTasks.map((t) => t.taskId) }, deletedAt: null },
       _sum: { durationSeconds: true },
     });
-    const live = await this.prisma.timeEntry.findFirst({
+    const live = await this.prisma.timeEntry.findMany({
       where: { workspaceId: ws.id, state: { not: "stopped" }, deletedAt: null, task: { project: { clientId } } },
       select: { id: true, member: { select: { name: true } }, startedAt: true },
+      orderBy: { createdAt: "asc" },
     });
     const taxes = await this.prisma.workspaceDefaultTax.findMany({ where: { workspaceId: ws.id }, orderBy: { position: "asc" } });
     const v = { paymentAccountMode: "default" as const, paymentAccountId: null };
@@ -201,7 +204,7 @@ export class InvoicesController {
         remainingMinor: t.fixedRemainingMinor,
         trackedSeconds: trackedOnFixed.find((x) => x.taskId === t.taskId)?._sum.durationSeconds ?? 0,
       })),
-      liveTimer: live ? { member: live.member.name, startedAt: live.startedAt?.toISOString() ?? null } : null,
+      liveTimers: live.map((l) => ({ member: l.member.name, startedAt: l.startedAt?.toISOString() ?? null })),
       taxes: taxes.map((t) => ({ id: t.id, name: t.name, rateBp: t.rateBp })),
       from: { businessName: ws.businessName || ws.name, senderName: ws.senderName, address: ws.address, phone: ws.phone, taxId: ws.taxId, email: ws.billingEmail },
       to: { name: client.name, contactName: client.contactName, address: client.address, taxId: client.taxId, emails: client.billingEmails },
@@ -541,8 +544,8 @@ export class InvoicesController {
       changesSummary: v?.changeSummary,
     });
     if (inv.status === "draft") vars.number = "{{number}}";
-    const subject = fillTemplate(tpl.subject, vars);
-    const message = fillTemplate(tpl.body, vars);
+    const subject = fillTemplate(withoutLinkLines(tpl.subject), vars);
+    const message = fillTemplate(withoutLinkLines(tpl.body), vars);
     const account = v ? await resolveAccount(this.prisma as unknown as Tx, ws, inv.client, v, inv.currency) : null;
     return {
       kind,
@@ -551,6 +554,7 @@ export class InvoicesController {
       message: message.text,
       missing: [...subject.missing, ...message.missing].filter((m) => m !== "number"),
       attachment: `${inv.number ?? "invoice"}.pdf`,
+      publicLinks: env.PUBLIC_INVOICE_LINKS,
       noPaymentAccount: !account && v?.paymentAccountMode !== "none",
       currency: inv.currency,
       issueDate: issue,
@@ -633,8 +637,8 @@ export class InvoicesController {
         idempotencyKey: opts.send.idempotencyKey,
         to: opts.send.to,
         cc: opts.send.cc,
-        subject: fillTemplate(opts.send.subject, vars).text,
-        text: fillTemplate(opts.send.message, vars).text,
+        subject: fillTemplate(withoutLinkLines(opts.send.subject), vars).text,
+        text: fillTemplate(withoutLinkLines(opts.send.message), vars).text,
       });
       await tx.invoiceActivity.create({
         data: { invoiceId, versionId, kind: isFirst ? "sent" : "correction_sent", actor: "member", actorId: ctx.member.id, data: { to: opts.send.to, rev: v.rev, emailId: email.id, changeSummary: opts.changeSummary ?? null } },
@@ -867,7 +871,7 @@ export class InvoicesController {
       if (thankYou && input.kind === "payment" && inv.client.billingEmails.length) {
         const tpl = (await tx.emailTemplate.findUnique({ where: { workspaceId_kind: { workspaceId: ws.id, kind: "thank_you" } } })) ?? DEFAULT_TEMPLATES.thank_you;
         const vars = emailVars({ ws, client: inv.client, number: inv.number, rev: cur.rev, currency: inv.currency, totalMinor: cur.total ?? 0, netPaidMinor: after, dueDate: d2s(cur.dueDate), token: inv.publicToken, paidMinor: input.amountMinor });
-        const email = await queueEmail(tx, ctx, { invoiceId: id, versionId: null, kind: "thank_you", idempotencyKey: randomUUID(), to: inv.client.billingEmails, cc: [], subject: fillTemplate(tpl.subject, vars).text, text: fillTemplate(tpl.body, vars).text });
+        const email = await queueEmail(tx, ctx, { invoiceId: id, versionId: null, kind: "thank_you", idempotencyKey: randomUUID(), to: inv.client.billingEmails, cc: [], subject: fillTemplate(withoutLinkLines(tpl.subject), vars).text, text: fillTemplate(withoutLinkLines(tpl.body), vars).text });
         await tx.invoiceActivity.create({ data: { invoiceId: id, kind: "thanked", actor: "member", actorId: ctx.member.id, data: { emailId: email.id } } });
       }
       await this.emit(tx, ctx, "payment", id);

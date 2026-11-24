@@ -1,7 +1,8 @@
-import { formatDuration, formatMoney } from "@paypure/domain";
+import { formatDuration, formatMoney, noteExtraLines, noteFirstLine } from "@paypure/domain";
 import { Lock } from "lucide-react";
 import Link from "next/link";
 import { type EntryRow, entryRange } from "@/lib/time";
+import { NoteInline } from "./note-md";
 import { ClientBadge, Note } from "./ui";
 
 /** Time entry row (Guide §5.10). */
@@ -21,8 +22,8 @@ export function EntryLine({
   selectable?: boolean;
 }) {
   const breaks = Math.max(0, e.segments.length - 1);
-  const firstLine = e.note.split("\n").find((l) => l.trim())?.replace(/^\s*[-*]\s+/, "") ?? "";
-  const more = e.note.split("\n").filter((l) => l.trim()).length - 1;
+  const firstLine = noteFirstLine(e.note);
+  const more = noteExtraLines(e.note);
   const billedIssued = e.invoice?.status === "issued";
   const href = editHref ?? `/time?view=day&date=${e.date}&edit=${e.id}`;
   return (
@@ -58,13 +59,13 @@ export function EntryLine({
         {!compact && firstLine && (
           <details className="mt-0.5 text-muted group">
             <summary className="list-none cursor-pointer truncate">
-              {firstLine}
+              <NoteInline text={firstLine} />
               {more > 0 && <span className="text-accent ml-2 group-open:hidden">+{more} lines</span>}
             </summary>
             {more > 0 && <Note text={e.note} className="mt-1" />}
           </details>
         )}
-        {compact && firstLine && <div className="text-muted truncate mt-0.5">{firstLine}</div>}
+        {compact && firstLine && <div className="text-muted truncate mt-0.5"><NoteInline text={firstLine} /></div>}
       </div>
       <div className="text-right shrink-0">
         <div className="flex items-center gap-2 justify-end">

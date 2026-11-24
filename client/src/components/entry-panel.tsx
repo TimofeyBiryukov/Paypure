@@ -8,6 +8,7 @@ import { useEffect, useRef, useState } from "react";
 import { deleteEntry, duplicateEntry, saveEntry } from "@/app/actions/time";
 import type { EntryRow } from "@/lib/time";
 import type { Catalog } from "@/lib/types";
+import { continueNoteList } from "./note-md";
 import { Submit } from "./submit";
 import { TaskPicker } from "./task-picker";
 import { ActionForm, FieldError } from "./toaster";
@@ -232,12 +233,12 @@ export function EntryPanel({
                 defaultValue={entry?.note ?? ""}
                 maxLength={5000}
                 rows={3}
-                placeholder="What did you work on? Lists with - work."
+                placeholder="What did you work on? Markdown lists work."
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
                     e.preventDefault();
                     e.currentTarget.form?.requestSubmit();
-                  }
+                  } else continueNoteList(e);
                 }}
               />
             </div>

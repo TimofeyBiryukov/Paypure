@@ -35,7 +35,8 @@ import type {
 import { env } from "../env";
 import { Prisma, type Tx } from "../prisma.service";
 
-export const TEMPLATE_VERSION = "sheet-1";
+// sheet-2: notes render the wider Markdown subset (packages/domain/src/note.ts).
+export const TEMPLATE_VERSION = "sheet-2";
 
 // ── Snapshots (08 §3.2) ──────────────────────────────────────────────────────────────────
 
@@ -541,8 +542,20 @@ export const DEFAULT_TEMPLATES: Record<"invoice" | "correction" | "reminder" | "
   },
 };
 
+/** null when public invoice pages are off (PUBLIC_INVOICE_LINKS). */
 export function publicLink(token: string) {
-  return `${env.PUBLIC_URL}/i/${token}`;
+  return env.PUBLIC_INVOICE_LINKS ? `${env.PUBLIC_URL}/i/${token}` : null;
+}
+
+/** With public pages off, drop every template line that mentions {{link}}, so stored templates still read well. */
+export function withoutLinkLines(text: string) {
+  if (env.PUBLIC_INVOICE_LINKS) return text;
+  return text
+    .split("\n")
+    .filter((l) => !/\{\{\s*link\s*\}\}/.test(l))
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
 }
 
 export function newPublicToken() {
@@ -576,7 +589,7 @@ export function emailVars(input: {
     paid: m(input.paidMinor ?? input.netPaidMinor),
     due_date: input.dueDate ? formatDateLong(input.dueDate) : undefined,
     days_overdue: String(overdue),
-    link: publicLink(input.token),
+    link: publicLink(input.token) ?? undefined,
     changes_summary: input.changesSummary ?? undefined,
   };
 }
@@ -609,7 +622,9 @@ export async function queueEmail(
   },
 ) {
   const ws = ctx.workspace;
-  const from = `${ws.senderName || ws.businessName || ws.name} <invoices@paypure.local>`;
+  // The row is the record of what was sent, so it stores the real From address.
+  const fromAddress = env.MAIL_FROM ?? (env.MAIL_TRANSPORT === "smtp" ? env.SMTP_USER : undefined) ?? "invoices@paypure.local";
+  const from = `"${(ws.senderName || ws.businessName || ws.name).replace(/["\\]/g, "")}" <${fromAddress}>`;
   return tx.outboundEmail.create({
     data: {
       workspaceId: ws.id,

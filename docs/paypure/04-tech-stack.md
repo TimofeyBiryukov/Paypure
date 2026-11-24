@@ -146,7 +146,7 @@ The brief's money rules are enforced by the database where possible, not only in
 |---|---|
 | Money is never a float | All amounts are **integer minor units** (`integer`, not `bigint`: Prisma returns `bigint` as JS `BigInt`, which breaks JSON) plus an ISO currency code. SQL sums are cast `::int`. Rates are minor units per hour, percentages basis points. On the wire money is `{ minor, currency }`. Rounding happens in one place (`@paypure/domain/money`, 07 §6) |
 | Durations | Integer **seconds**. Timestamps are `timestamptz` (UTC). An entry is made of segments (`time_entry_segments`), and every total reads the cached `duration_seconds` (Σ segments). An entry's `date` is a `date` in **the entry's own** `time_zone`, which drives day grouping and gap rows. Segments can't overlap within an entry: an exclusion constraint, so the first migration enables `btree_gist` (06 §2.2) |
-| One live timer per member | `UNIQUE (member_id) WHERE state <> 'stopped' AND deleted_at IS NULL` (running and paused both count), plus one open segment per entry (06 §2.2) |
+| Parallel timers, one per task | `UNIQUE (member_id, task_id) WHERE state <> 'stopped' AND deleted_at IS NULL` (running and paused both count). The limit of 5 live per member is checked by the service under `pg_advisory_xact_lock`. Plus one open segment per entry (06 §2.2) |
 | Billed = claimed | `time_entries.invoice_id` is the claim, set when the draft is created, so time can't be invoiced twice (S9). Which line bills an entry is recorded per version in `invoice_line_entries`. Deleting a draft or voiding releases the claim (08 §3.1) |
 | Taken off unbilled (D10) | `time_entries.off_invoice` enum (`billed_elsewhere`, `written_off`) + `off_invoice_ref`. A check makes it and `invoice_id` mutually exclusive. "Unbilled" everywhere is defined once, in [07 §10](07-money-and-billing.md#10-unbilled-as-sql) (hourly tasks only, finished entries only; fixed fees have their own remaining-fee rule) |
 | Line maths | `invoice_lines.qty_hundredths` is stored for every line kind (rounded once from summed seconds for time lines), and `amount_minor = round_half_up(qty_hundredths × rate / 100)` is computed in `@paypure/domain` and stored, with a check constraint. The PDF never re-derives qty from seconds (07 §6) |
@@ -257,7 +257,7 @@ Only two kinds of file in v1: the business logo and invoice PDFs. Both are store
 ### 6.2 Speed for daily use (Brief §5.3)
 
 - **Timer**: `started_at` comes from the server. The ticking clock is a client component, so
-  there is no polling. The timer state is in the root layout so the top-bar pill is on every page.
+  there is no polling. The timer state (every live timer) is in the root layout so the top-bar pill is on every page.
   Other devices and tabs update through live sync: one tab per browser holds the SSE connection
   and fans events out to the others over `BroadcastChannel` ([06 §4](06-time-and-timers.md#4-live-sync)).
 - **Time zones**: the device zone reaches the server in a `tz` cookie, so SSR and the browser

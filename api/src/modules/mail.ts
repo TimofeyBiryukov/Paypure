@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { Injectable, Logger, type OnModuleDestroy, type OnModuleInit } from "@nestjs/common";
+import nodemailer, { type Transporter } from "nodemailer";
 import pino from "pino";
 import { env } from "../env";
 import { PrismaService } from "../prisma.service";
@@ -8,6 +9,21 @@ import { PdfService } from "./pdf";
 
 const mailLog = pino({ name: "mail" });
 const MAX_ATTEMPTS = 5;
+
+/** nodemailer over SMTP: Mailpit in dev, or a real account such as Gmail (see docs/email-setup.md). */
+function createSmtp(): Transporter {
+  const url = new URL(env.SMTP_URL);
+  const secure = url.protocol === "smtps:";
+  return nodemailer.createTransport({
+    host: url.hostname,
+    port: Number(url.port) || (secure ? 465 : 587),
+    secure,
+    ...(env.SMTP_USER ? { auth: { user: env.SMTP_USER, pass: env.SMTP_PASS ?? "" } } : {}),
+    connectionTimeout: 15_000,
+    greetingTimeout: 15_000,
+    socketTimeout: 30_000,
+  });
+}
 
 /**
  * The outbox (08 §7.3–7.4). Emails are rendered and stored in the send transaction; this loop
@@ -21,6 +37,7 @@ export class OutboxWorker implements OnModuleInit, OnModuleDestroy {
   private busy = false;
   /** Backoff per version after a failed render, so a broken template doesn't spin. */
   private readonly renderFailures = new Map<string, { n: number; next: number }>();
+  private readonly smtp = env.MAIL_TRANSPORT === "smtp" ? createSmtp() : null;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -29,11 +46,19 @@ export class OutboxWorker implements OnModuleInit, OnModuleDestroy {
   ) {}
 
   onModuleInit() {
+    if (this.smtp) {
+      const where = `${env.SMTP_URL}${env.SMTP_USER ? ` as ${env.SMTP_USER}` : ""}`;
+      this.smtp.verify().then(
+        () => mailLog.info(`SMTP ready: ${where}${env.MAIL_REDIRECT_TO ? ` (all mail redirected to ${env.MAIL_REDIRECT_TO})` : ""}`),
+        (e) => this.log.error(`SMTP check failed for ${where}: ${String(e)}`),
+      );
+    }
     this.timer = setInterval(() => void this.tick(), 2000);
   }
 
   onModuleDestroy() {
     clearInterval(this.timer);
+    this.smtp?.close();
   }
 
   async tick() {
@@ -85,17 +110,18 @@ export class OutboxWorker implements OnModuleInit, OnModuleDestroy {
       if (!locked.length) return;
       const email = await tx.outboundEmail.findUniqueOrThrow({ where: { id } });
       const attachments: { name: string; bytes: number; sha256: string }[] = [];
+      const files: { filename: string; content: Buffer; contentType: string }[] = [];
       const needsPdf = ["invoice", "correction", "reminder", "test"].includes(email.kind) && email.versionId;
       try {
         if (needsPdf && email.versionId) {
           const version = await tx.invoiceVersion.findUniqueOrThrow({
             where: { id: email.versionId },
-            include: { invoice: { select: { number: true } }, file: { select: { sha256: true, bytes: true } } },
+            include: { invoice: { select: { number: true } }, file: { select: { sha256: true, bytes: true, pdf: true } } },
           });
           let file = version.file;
           if (email.kind === "test") {
             const bytes = await this.pdf.renderVersion(email.versionId, { watermark: true });
-            file = { sha256: createHash("sha256").update(bytes).digest("hex"), bytes: bytes.length };
+            file = { sha256: createHash("sha256").update(bytes).digest("hex"), bytes: bytes.length, pdf: new Uint8Array(bytes) };
           } else if (!file) {
             // Wait for invoice.render (state waiting_for_pdf).
             await tx.outboundEmail.update({
@@ -107,6 +133,7 @@ export class OutboxWorker implements OnModuleInit, OnModuleDestroy {
           }
           const name = `${version.invoice.number ?? "draft"}${version.rev > 1 ? `-rev${version.rev}` : ""}.pdf`;
           attachments.push({ name, bytes: file.bytes, sha256: file.sha256 });
+          files.push({ filename: name, content: Buffer.from(file.pdf), contentType: "application/pdf" });
         }
         const messageId = `<${email.id}@paypure>`;
         if (env.MAIL_TRANSPORT === "log") {
@@ -128,8 +155,22 @@ export class OutboxWorker implements OnModuleInit, OnModuleDestroy {
             },
             "email delivered (log transport)",
           );
-        } else {
-          throw new Error("SMTP transport is not part of the prototype; use MAIL_TRANSPORT=log");
+        } else if (this.smtp) {
+          const redirect = env.MAIL_REDIRECT_TO;
+          const info = await this.smtp.sendMail({
+            messageId,
+            from: email.from,
+            replyTo: email.replyTo || undefined,
+            to: redirect ? [redirect] : email.to,
+            cc: redirect ? [] : email.cc,
+            subject: email.subject,
+            text: email.textBody,
+            html: email.htmlBody,
+            attachments: files,
+            headers: redirect ? { "X-Original-To": [...email.to, ...email.cc].join(", ") } : {},
+          });
+          if (info.rejected?.length) throw new Error(`Rejected by the server: ${info.rejected.join(", ")}`);
+          mailLog.info({ email_id: email.id, kind: email.kind, to: redirect ?? email.to, response: info.response }, "email delivered (smtp)");
         }
         await tx.outboundEmail.update({
           where: { id },

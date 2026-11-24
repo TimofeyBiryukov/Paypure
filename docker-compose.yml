@@ -69,9 +69,16 @@ services:
       APP_DATABASE_URL: postgresql://paypure_app:paypure_app@postgres:5432/paypure
       CLIENT_INTERNAL_URL: http://client:3000
       PUBLIC_URL: ${PUBLIC_URL:-http://localhost:3000}
+      # Client-facing invoice pages (/i/<token>) and the link in emails. Off by default.
+      PUBLIC_INVOICE_LINKS: ${PUBLIC_INVOICE_LINKS:-false}
       GOTENBERG_URL: http://gotenberg:3000
       MAIL_TRANSPORT: ${MAIL_TRANSPORT:-log}
-      SMTP_URL: smtp://mailpit:1025
+      # Real email (e.g. your Gmail): put these in .env, see docs/email-setup.md
+      SMTP_URL: ${SMTP_URL:-smtp://mailpit:1025}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      MAIL_FROM: ${MAIL_FROM:-}
+      MAIL_REDIRECT_TO: ${MAIL_REDIRECT_TO:-}
       SESSION_SECRET: ${SESSION_SECRET:-dev-only-session-secret}
       PRINT_SIGNING_SECRET: ${PRINT_SIGNING_SECRET:-dev-only-print-secret}
       NODE_OPTIONS: --max-old-space-size=384

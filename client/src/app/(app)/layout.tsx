@@ -15,7 +15,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   if (!me) redirect("/login");
   const [catalog, timer] = await Promise.all([
     api<Catalog>("/v1/catalog"),
-    api<{ entry: TimerSnapshot | null }>("/v1/timer"),
+    api<{ entries: TimerSnapshot[] }>("/v1/timer"),
   ]);
   const initials = me.member.name
     .split(/\s+/)
@@ -34,7 +34,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           </Link>
           <NavLinks isAdmin={me.isAdmin} variant="top" />
           <div className="ml-auto flex items-center gap-1">
-            <TimerPill initial={timer.entry} catalog={catalog} tz={me.tz} timeFormat={me.member.timeFormat} />
+            <TimerPill initial={timer.entries} catalog={catalog} tz={me.tz} timeFormat={me.member.timeFormat} />
             <Palette catalog={catalog} isAdmin={me.isAdmin} />
             <details className="menu relative">
               <summary className="w-8 h-8 rounded-full bg-sunken flex items-center justify-center t-micro focus-ring" aria-label="Account menu">

@@ -42,7 +42,7 @@ export interface BuilderData {
   client: { id: string; name: string; colour: number; currency: string; termsDays: number; lineLayout: LineLayout };
   entries: BuilderEntry[];
   fixed: { taskId: string; taskName: string; projectName: string; feeMinor: number; remainingMinor: number; trackedSeconds: number }[];
-  liveTimer: { member: string; startedAt: string | null } | null;
+  liveTimers: { member: string; startedAt: string | null }[];
   taxes: { id: string; name: string; rateBp: number }[];
   from: SheetData["from"];
   to: SheetData["to"];
@@ -153,8 +153,11 @@ export function Builder({ data, today }: { data: BuilderData; today: string }) {
         <input type="hidden" name="clientId" value={data.client.id} />
         <input type="hidden" name="currency" value={cur} />
 
-        {data.liveTimer && (
-          <div className="banner banner-warning text-sm">A timer is running on {data.client.name} ({data.liveTimer.member}). Stop it to include that time.</div>
+        {data.liveTimers.length > 0 && (
+          <div className="banner banner-warning text-sm">
+            {data.liveTimers.length === 1 ? "A timer is" : `${data.liveTimers.length} timers are`} running on {data.client.name} (
+            {[...new Set(data.liveTimers.map((t) => t.member))].join(", ")}). Stop {data.liveTimers.length === 1 ? "it" : "them"} to include that time.
+          </div>
         )}
 
         <fieldset>

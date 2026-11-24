@@ -14,6 +14,7 @@ export interface EmailPreview {
   message: string;
   missing: string[];
   attachment: string;
+  publicLinks: boolean;
   noPaymentAccount: boolean;
   currency: string;
   issueDate: string;
@@ -90,7 +91,8 @@ export function SendForm({ invoiceId, clientId, preview, isFirst, changeSummary,
         {preview.missing.length > 0 && <p className="error-text">Fill in: {preview.missing.map((m) => `{{${m}}}`).join(", ")}</p>}
       </div>
       <p className="text-sm text-muted">
-        Attached: {preview.attachment} · includes a link to view online
+        Attached: {preview.attachment}
+        {preview.publicLinks && " · includes a link to view online"}
       </p>
       <div className="flex gap-2 flex-wrap">
         {/* The primary action is the first submit button (Guide §7.2 rule 2) */}

@@ -1,5 +1,6 @@
 import { secondsToHundredths } from "./duration";
 import { formatMoney, lineAmount, percentOf } from "./money";
+import { noteFirstLine } from "./note";
 import {
   type CalendarDate,
   formatDateLong,
@@ -174,9 +175,9 @@ function sortEntries(entries: BillableEntry[]): BillableEntry[] {
 
 function notesList(entries: BillableEntry[]): string {
   return entries
-    .map((e) => e.note.trim())
+    .map((e) => noteFirstLine(e.note))
     .filter(Boolean)
-    .map((n) => `- ${n.split("\n")[0].replace(/^[-*]\s+/, "")}`)
+    .map((n) => `- ${n}`)
     .join("\n");
 }
 
@@ -278,38 +279,4 @@ export function affectsDocument(changedFields: string[], layout: LineLayout): bo
   if (changedFields.some((f) => always.includes(f))) return true;
   const notesPrint = layout.mode === "per_entry" || layout.showNotes;
   return notesPrint && changedFields.includes("note");
-}
-
-/** Light Markdown subset for notes (Guide §5.13): bullet lists, line breaks, links as text. */
-export type NoteBlock = { type: "p"; text: string } | { type: "ul"; items: string[] };
-
-export function parseNote(note: string): NoteBlock[] {
-  const blocks: NoteBlock[] = [];
-  let para: string[] = [];
-  let list: string[] | null = null;
-  const flushPara = () => {
-    if (para.length) blocks.push({ type: "p", text: para.join("\n") });
-    para = [];
-  };
-  const flushList = () => {
-    if (list?.length) blocks.push({ type: "ul", items: list });
-    list = null;
-  };
-  for (const raw of note.split("\n")) {
-    const m = raw.match(/^\s*[-*]\s+(.*)$/);
-    if (m) {
-      flushPara();
-      if (!list) list = [];
-      list.push(m[1]);
-    } else if (raw.trim() === "") {
-      flushPara();
-      flushList();
-    } else {
-      flushList();
-      para.push(raw);
-    }
-  }
-  flushPara();
-  flushList();
-  return blocks;
 }

@@ -4,6 +4,7 @@ import type { FastifyReply } from "fastify";
 import { Public } from "../common/auth";
 import { d2s } from "../common/dates";
 import { ApiError, notFound } from "../common/errors";
+import { env } from "../env";
 import { PrismaService } from "../prisma.service";
 import { EventsService } from "./events";
 import { buildSheet, versionInclude } from "./invoice-ops";
@@ -20,6 +21,7 @@ export class PublicController {
   ) {}
 
   private async byToken(token: string) {
+    if (!env.PUBLIC_INVOICE_LINKS) throw notFound("This invoice link isn't valid.");
     const inv = await this.prisma.invoice.findUnique({
       where: { publicToken: token },
       include: {

@@ -21,6 +21,7 @@ interface InvoicingSettings {
   taxes: { id: string; name: string; rateBp: number }[];
   templates: { kind: "invoice" | "correction" | "reminder" | "thank_you"; subject: string; body: string }[];
   numbering: { next: number; maxUsed: number; preview: string };
+  publicLinks: boolean;
 }
 
 const TEMPLATE_LABELS = {
@@ -36,7 +37,7 @@ const VARIABLES = ["number", "client_name", "total", "balance", "due_date", "lin
 export default async function InvoicingPage() {
   const me = (await getMe())!;
   if (!me.isAdmin) redirect("/settings/profile");
-  const { workspace: ws, taxes, templates, numbering } = await api<InvoicingSettings>("/v1/settings/workspace");
+  const { workspace: ws, taxes, templates, numbering, publicLinks } = await api<InvoicingSettings>("/v1/settings/workspace");
   return (
     <div className="space-y-6">
       <section className="card p-6">
@@ -166,10 +167,11 @@ export default async function InvoicingPage() {
           <h2 className="t-title-2 mb-1">Email templates</h2>
           <p className="text-muted">
             Variables:{" "}
-            {VARIABLES.map((v) => (
+            {VARIABLES.filter((v) => publicLinks || v !== "link").map((v) => (
               <code key={v} className="text-[12px] bg-sunken rounded px-1 mr-1">{`{{${v}}}`}</code>
             ))}
           </p>
+          {!publicLinks && <p className="hint">Public invoice pages are off, so lines with {"{{link}}"} are left out of sent emails.</p>}
         </div>
         {templates.map((t) => (
           <details key={t.kind} className="border-t border-line pt-4">

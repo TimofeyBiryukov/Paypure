@@ -15,7 +15,7 @@ export async function restoreEntry(_: ActionState, fd: FormData): Promise<Action
 export async function restoreTimer(_: ActionState, fd: FormData): Promise<ActionState> {
   return run(async () => {
     await api(`/v1/timer/${str(fd, "id")}/restore`, {
-      body: { state: str(fd, "state") || undefined, discardId: str(fd, "discardId") || undefined },
+      body: { state: str(fd, "state") || undefined },
     });
     revalidatePath("/", "layout");
   });

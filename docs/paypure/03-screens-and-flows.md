@@ -52,7 +52,7 @@ the task picker. Members only see Home · Time · Clients (with money hidden).
 
 | Region | Content |
 |---|---|
-| Header | "Good morning, Jane" + today's date. **P**: `Start timer` (or the running timer's task and clock, large) |
+| Header | "Good morning, Jane" + today's date. **P**: `Start timer` (or the running timers' tasks and clocks, large) |
 | Today | Today's entries (compact rows) + gap rows + total `5h 40m`. Link: "Open day" → `/time?view=day` |
 | This week | Mini bar chart Mon–Sun (client colours), total vs last week (`32h 15m · +3h`) |
 | **Ready to invoice** *(Admin)* | One row per client with unbilled work: badge, name, unbilled hours, **unbilled amount**, oldest unbilled date ("since 2 Oct"), `Create invoice` button. Sorted by amount. A per-client threshold (default €1,000) adds a subtle "Ready" tag. Work older than 60 days gets a `Stale` tag and a *Review* link (→ Time, filtered, with *Take off unbilled* ready). Archived clients are left out. *⟵ PD: Paydirt had a threshold setting but didn't use it visibly, and stale time stayed unbilled for years ([05 §3.1](05-paydirt-data.md#31-stale-unbilled-time-never-goes-away))* |
@@ -85,7 +85,8 @@ A timeline column on the left (08:00–19:00) is an option to explore in mockups
 Breaks show hatched inside their entry. Overlapping entries are allowed and get a small warning.
 
 States: empty week → "No time tracked this week" + `Start timer`. Billed rows are locked (§5.10).
-Running timer entry appears at the top of today with a live clock.
+Running timer entries appear at the top of today with live clocks. With parallel timers the day
+header shows `9:30 · 8:00 on the clock` (06 §2.10).
 ⓜ Default to Day view, swipe between days, and a FAB opens `Add entry`.
 
 ---
@@ -116,11 +117,13 @@ correction is approved or discarded (08 §5.2).
 
 ### S4 — Timer popover (overlay, from the top-bar pill)
 
-| Idle | Running |
-|---|---|
-| Task picker, focused. Each result row has `⏵` and a `⋯` menu → *Start 5/15/30/60 min ago*, *Start at end of last entry (10:45)*. ↵ starts | Big clock (worked time) · task (click to change) · note (autosave) · billable switch · "Started 09:12 · edit" with ±nudges · "2 breaks · 0:25" · `Pause`/`Resume` · `Stop` (P) · `Discard` (undo toast). Stop with no task opens "Choose a task to log 1:24" |
+| Idle | Running | Several running |
+|---|---|---|
+| Task picker, focused. Each result row has `⏵` and a `⋯` menu → *Start 5/15/30/60 min ago*, *Start at end of last entry (10:45)*. ↵ starts | Big clock (worked time) · task (click to change) · note (autosave) · billable switch · "Started 09:12 · edit" with ±nudges · "2 breaks · 0:25" · `Pause`/`Resume` · `Stop` (P) · `Discard` (undo toast). Stop with no task opens "Choose a task to log 1:24". Below: `+ Start another timer` | A list of the live timers, newest first. Each row: client dot, `Client · Task`, clock, `⏸`/`⏵`, `■`. Clicking a row expands it into the *Running* details. The newest one starts expanded. `+ Start another timer` at the bottom opens the idle picker. At 5 live it is disabled: "5 timers live · stop one to start another" |
 
-On stop, a toast says "Logged 1:24 to Acme · Design review" with `Undo` and `Edit`.
+On stop, a toast says "Logged 1:24 to Acme · Design review" with `Undo` and `Edit`. Starting a
+timer never stops the others (06 §2.4). Starting a task that already has a live timer expands that
+timer instead.
 
 ---
 
@@ -412,8 +415,10 @@ offers `⏵ Start` and `+ Log time` directly.
 ### F2 — Track a day (Maker)
 
 1. 09:05 ⌘K → "acme des" → ↵: the timer runs on *Acme / Website / Design*.
-2. 10:40 click the top-bar pill → change the task to *Development* (or stop and start a new one;
-   starting another timer auto-stops the first, with undo).
+2. 10:40 click the top-bar pill → change the task to *Development* (or stop it and start a new
+   one).
+   11:00 a long export for Globex needs watching: ⌘K → "globex exp" → ↵. Both timers run in
+   parallel and the pill shows `+1`. 11:50 stop the Globex timer from its row in the popover.
 3. Lunch: `Pause`. 13:15 `Resume`; the break never counts.
 4. 16:00 forgot to restart: Time → Day shows a gap row `12:30–16:00 · 3:30 not tracked [+ Fill]`
    → the panel opens with the times filled in → pick a task → Save.
@@ -482,7 +487,7 @@ Until recurring invoices exist (D5), this is the path, and it must take under 30
 | S1 | Home | ✔ | ✔ | first run, Member, normal, timer running |
 | S2 | Time (week, day) | ✔ | ✔ (day) | empty, filtered, bulk select, billed rows, written off / billed elsewhere, long multi-line note, duration-only, overnight |
 | S3 | Time entry panel | ✔ | ✔ sheet | new, edit, billed/locked, parse hints, error, with breaks, DST invalid time |
-| S4 | Timer popover + top-bar pill | ✔ | ✔ | idle, running, no task, paused, paused overnight → resume, long-running, start-in-past menu |
+| S4 | Timer popover + top-bar pill | ✔ | ✔ | idle, running, no task, paused, paused overnight → resume, long-running, start-in-past menu, 2–5 parallel timers (one paused), at the limit |
 | S5 | Clients | ✔ | ✔ | empty, search, archived, Member |
 | S6 | New client | ✔ | ✔ | collapsed, expanded |
 | S7 | Client (4 tabs) | ✔ | ✔ | nothing unbilled, archived, currency locked |

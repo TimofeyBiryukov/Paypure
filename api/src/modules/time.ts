@@ -7,6 +7,7 @@ import {
   OffInvoiceInput,
   resolveRate,
   TimeEntryInput,
+  TIMER_LIMIT,
   TimerStartInput,
   TimerUpdateInput,
   toLocalDate,
@@ -101,20 +102,23 @@ export class TimeController {
     await this.events.emit(tx, { ws: ctx.workspace.id, member: ctx.member.id, topic: "time", action, entity: entryId ?? undefined });
   }
 
+  /** Every live timer of the member, newest first (parallel timers, 06 §2.4). */
   @Get("timer")
   async getTimer(@C() ctx: Ctx) {
-    const live = await this.prisma.timeEntry.findFirst({
+    const live = await this.prisma.timeEntry.findMany({
       where: { memberId: ctx.member.id, state: { not: "stopped" }, deletedAt: null },
       select: { id: true },
+      orderBy: { createdAt: "desc" },
     });
-    return this.snapshot(this.prisma, live?.id ?? null);
+    const snaps = await Promise.all(live.map((e) => this.snapshot(this.prisma, e.id)));
+    return { entries: snaps.map((x) => x.entry).filter(Boolean) };
   }
 
   /** Close the open segment and recompute the cache columns (invariant 2, 06 §2.3). */
   private async finalize(tx: Tx, entryId: string, state: "paused" | "stopped", now: Date) {
+    // Closing an open segment in the second it started would violate segment_positive: drop it first.
+    await tx.$executeRaw`DELETE FROM time_entry_segments WHERE time_entry_id = ${entryId}::uuid AND ended_at IS NULL AND started_at >= ${now}`;
     await tx.timeEntrySegment.updateMany({ where: { timeEntryId: entryId, endedAt: null }, data: { endedAt: now } });
-    // A zero-length segment would violate segment_positive; drop it instead.
-    await tx.$executeRaw`DELETE FROM time_entry_segments WHERE time_entry_id = ${entryId}::uuid AND ended_at <= started_at`;
     const segs = await tx.timeEntrySegment.findMany({ where: { timeEntryId: entryId }, orderBy: { startedAt: "asc" } });
     const duration = segs.reduce((s, x) => s + secondsBetween(x.startedAt, x.endedAt as Date), 0);
     await tx.timeEntry.update({
@@ -130,18 +134,24 @@ export class TimeController {
     return duration;
   }
 
-  /** Stop the member's live entry; refuses with needs_task when it has no task (06 §2.7). */
-  private async stopLive(tx: Tx, ctx: Ctx, now: Date) {
-    const live = await tx.timeEntry.findFirst({
-      where: { memberId: ctx.member.id, state: { not: "stopped" }, deletedAt: null },
-    });
-    if (!live) return null;
-    if (!live.taskId) {
-      throw conflict("needs_task", "Choose a task for the running timer first, or discard it.", { entryId: live.id });
+  /** Serialise the member's timer starts and restores (06 §2.8). Released at commit. */
+  private async lockMember(tx: Tx, ctx: Ctx) {
+    await tx.$queryRaw`SELECT 1 FROM (SELECT pg_advisory_xact_lock(6060, hashtext(${ctx.member.id}))) AS l`;
+  }
+
+  /** Refuse when one more live entry would pass the limit (06 §2.4). Call under lockMember. */
+  private async assertRoom(tx: Tx, ctx: Ctx, adding = 1) {
+    const live = await tx.timeEntry.count({ where: { memberId: ctx.member.id, state: { not: "stopped" }, deletedAt: null } });
+    if (live + adding > TIMER_LIMIT) {
+      throw conflict("timer_limit", `You have ${TIMER_LIMIT} timers live. Stop one first.`);
     }
-    const prevState = live.state;
-    await this.finalize(tx, live.id, "stopped", now);
-    return { id: live.id, prevState };
+  }
+
+  /** A second live timer on one task (06 §2.2 one_live_timer_per_task). */
+  private static taskLive(e: unknown) {
+    return e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002"
+      ? conflict("task_live", "A timer is already live on that task.")
+      : e;
   }
 
   @Post("timer/start")
@@ -149,15 +159,25 @@ export class TimeController {
   async start(@C() ctx: Ctx, @Body() body: unknown) {
     const input = parse(TimerStartInput, body);
     const tz = input.tz && isValidTimeZone(input.tz) ? input.tz : ctx.tz;
-    const run = async () =>
-      this.prisma.$transaction(async (tx) => {
+    // Parallel timers: starting never stops another one (06 §2.4).
+    try {
+      return await this.prisma.$transaction(async (tx) => {
         const now = truncSec(new Date());
         let task = null;
         if (input.taskId) {
           task = await tx.task.findFirst({ where: { id: input.taskId, workspaceId: ctx.workspace.id } });
           if (!task) throw notFound("Task not found");
         }
-        const stopped = await this.stopLive(tx, ctx, now);
+        await this.lockMember(tx, ctx);
+        if (task) {
+          // One live timer per task: hand back the one already running (06 §2.4).
+          const same = await tx.timeEntry.findFirst({
+            where: { memberId: ctx.member.id, taskId: task.id, state: { not: "stopped" }, deletedAt: null },
+            select: { id: true },
+          });
+          if (same) return { ...(await this.snapshot(tx, same.id, false)), existing: true };
+        }
+        await this.assertRoom(tx, ctx);
         let startAt = now;
         if (input.offsetSeconds) startAt = new Date(now.getTime() - input.offsetSeconds * 1000);
         if (input.afterLastEntry) {
@@ -182,15 +202,10 @@ export class TimeController {
           },
         });
         await this.emitTimer(tx, ctx, "started", entry.id);
-        const snap = await this.snapshot(tx, entry.id);
-        return { ...snap, stoppedEntryId: stopped?.id ?? null, stoppedPrevState: stopped?.prevState ?? null };
+        return { ...(await this.snapshot(tx, entry.id)), existing: false };
       });
-    try {
-      return await run();
     } catch (e) {
-      // Two starts at once: the loser retries once and then auto-stops the winner (06 §2.8).
-      if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") return run();
-      throw e;
+      throw TimeController.taskLive(e);
     }
   }
 
@@ -276,24 +291,23 @@ export class TimeController {
         where: { id, memberId: ctx.member.id, state: { not: "stopped" }, deletedAt: null },
         data: { deletedAt: new Date() },
       });
-      if (r.count) await this.emitTimer(tx, ctx, "discarded", null);
+      if (r.count) await this.emitTimer(tx, ctx, "discarded", id);
       return { entry: null, applied: r.count > 0 };
     });
   }
 
-  /** Undo for "start another" / "stop": restore an entry to its previous live state. */
+  /** Undo for "stop" / "discard": restore an entry to its previous live state. */
   @Post("timer/:id/restore")
   @HttpCode(200)
-  async restoreTimer(@C() ctx: Ctx, @Param("id") id: string, @Body() body: { state?: "running" | "paused"; discardId?: string }) {
+  async restoreTimer(@C() ctx: Ctx, @Param("id") id: string, @Body() body: { state?: "running" | "paused" }) {
     return this.prisma.$transaction(async (tx) => {
-      if (body.discardId) {
-        await tx.timeEntry.updateMany({
-          where: { id: body.discardId, memberId: ctx.member.id, state: { not: "stopped" } },
-          data: { deletedAt: new Date() },
-        });
-      }
       const e = await tx.timeEntry.findFirst({ where: { id, memberId: ctx.member.id } });
       if (!e || e.invoiceId || e.offInvoice) return { entry: null, applied: false };
+      // Undoing a stop or a discard makes the entry live again, so it counts toward the limit.
+      if (e.deletedAt ? e.state !== "stopped" : e.state === "stopped") {
+        await this.lockMember(tx, ctx);
+        await this.assertRoom(tx, ctx);
+      }
       try {
         if (e.deletedAt) {
           await tx.timeEntry.update({ where: { id }, data: { deletedAt: null, version: { increment: 1 } } });
@@ -307,7 +321,7 @@ export class TimeController {
         }
       } catch (err) {
         if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
-          throw conflict("timer_running", "You've started another timer since. Stop it first.");
+          throw conflict("task_live", "You've started another timer on this task since. Stop it first.");
         }
         throw err;
       }
@@ -329,6 +343,11 @@ export class TimeController {
       if ("taskId" in input && input.taskId) {
         const task = await tx.task.findFirst({ where: { id: input.taskId, workspaceId: ctx.workspace.id } });
         if (!task) throw notFound("Task not found");
+        const other = await tx.timeEntry.findFirst({
+          where: { memberId: ctx.member.id, taskId: task.id, state: { not: "stopped" }, deletedAt: null, id: { not: id } },
+          select: { id: true },
+        });
+        if (other) throw conflict("task_live", "Another of your timers is already on that task.", { entryId: other.id });
         data.task = { connect: { id: task.id } };
         // billable is re-derived from the mode when a task is first set (06 §2.7)
         if (!e.taskId || input.billable === undefined) data.billable = task.billingMode === "hourly";
