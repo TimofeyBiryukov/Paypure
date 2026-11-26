@@ -33,7 +33,7 @@ services:
   # One-shot: migrations run as the table owner, never on app boot (Tech §7.2).
   api-migrate:
     <<: *common
-    image: paypure-api:${VERSION:?}
+    image: paypure-api:${API_TAG:?}
     restart: "no"
     command: ["node_modules/.bin/prisma", "migrate", "deploy"]
     environment:
@@ -44,7 +44,7 @@ services:
 
   api:
     <<: *common
-    image: paypure-api:${VERSION:?}
+    image: paypure-api:${API_TAG:?}
     environment:
       TZ: UTC
       NODE_ENV: production
@@ -77,7 +77,7 @@ services:
 
   client:
     <<: *common
-    image: paypure-client:${VERSION:?}
+    image: paypure-client:${CLIENT_TAG:?}
     environment:
       TZ: UTC
       NODE_ENV: production

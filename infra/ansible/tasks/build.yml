@@ -1,30 +1,22 @@
-- name: Are this version's images already on the server
-  ansible.builtin.command: >-
-    docker image inspect paypure-api:{{ paypure_version }} paypure-client:{{ paypure_version }}
+- name: Which images the server already has
+  ansible.builtin.command: docker image inspect paypure-{{ item.key }}:{{ item.value }}
+  loop: "{{ image_tags | dict2items }}"
   register: have_images
   changed_when: false
   failed_when: false
 
-- name: Build arm64 images locally
-  when: have_images.rc != 0
+- name: Images to build and ship
+  ansible.builtin.set_fact:
+    missing_images: >-
+      {{ have_images.results | rejectattr('rc', 'equalto', 0)
+         | map(attribute='item.key') | list }}
+
+- name: Build missing arm64 images locally
+  ansible.builtin.command: >-
+    docker buildx build --platform linux/arm64 --target prod
+    -f {{ item }}/Dockerfile -t paypure-{{ item }}:{{ image_tags[item] }} --load .
+  args: { chdir: "{{ repo_root }}" }
+  loop: "{{ missing_images }}"
   delegate_to: localhost
   run_once: true
-  block:
-    - name: Build {{ item }}
-      ansible.builtin.command: >-
-        docker buildx build --platform linux/arm64 --target prod
-        -f {{ item }}/Dockerfile -t paypure-{{ item }}:{{ paypure_version }} --load .
-      args: { chdir: "{{ repo_root }}" }
-      loop: [api, client]
-      changed_when: true
-
-    - name: Build directory exists
-      ansible.builtin.file: { path: "{{ build_dir }}", state: directory, mode: "0700" }
-
-    - name: Save both images to one tarball
-      ansible.builtin.shell: >-
-        set -o pipefail &&
-        docker save paypure-api:{{ paypure_version }} paypure-client:{{ paypure_version }}
-        | gzip -1 > {{ build_dir }}/paypure-{{ paypure_version }}.tar.gz
-      args: { executable: /bin/bash }
-      changed_when: true
+  changed_when: true

@@ -1,13 +1,16 @@
-- name: List paypure image tags (newest first)
-  ansible.builtin.shell: >-
-    docker image ls paypure-api --format '{{ "{{" }}.CreatedAt{{ "}}" }}|{{ "{{" }}.Tag{{ "}}" }}'
-    | sort -r | cut -d'|' -f2
-  register: tags
-  changed_when: false
-
+# Per repo, keep the running tag plus the newest (images_keep - 1) others.
 - name: Remove old paypure images
-  ansible.builtin.command: docker image rm paypure-api:{{ item }} paypure-client:{{ item }}
-  loop: "{{ tags.stdout_lines[images_keep:] | reject('equalto', paypure_version) | list }}"
+  ansible.builtin.shell: |
+    set -o pipefail
+    docker image ls paypure-{{ item }} \
+      --format '{{ "{{" }}.CreatedAt{{ "}}" }}|{{ "{{" }}.Tag{{ "}}" }}' \
+      | sort -r | cut -d'|' -f2 | grep -vxF '{{ image_tags[item] }}' \
+      | tail -n +{{ images_keep }} \
+      | while read -r t; do
+          docker image rm "paypure-{{ item }}:$t" >/dev/null && echo "removed $t"
+        done
+    true
+  args: { executable: /bin/bash }
+  loop: [api, client]
   register: rmi
-  changed_when: rmi.rc == 0
-  failed_when: false
+  changed_when: "'removed' in rmi.stdout"

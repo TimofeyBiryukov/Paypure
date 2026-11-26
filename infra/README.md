@@ -30,16 +30,19 @@ ansible-playbook deploy.yml
 ```
 
 What `deploy.yml` does:
-1. Preflight: checks arm64, docker access, ≥3 GB free disk and the port, and records the other
+1. Preflight: checks arm64, docker access, ≥1 GB free disk and the port, and records the other
    running containers.
-2. The version is the git short sha. A dirty tree is refused unless you pass
-   `-e allow_dirty=true`.
-3. If the server doesn't have that version yet, it builds `linux/arm64` images locally with buildx,
-   copies them over as one tarball and runs `docker load`.
+2. The release version is the git short sha (shown in `.env` as `VERSION`). A dirty tree is
+   refused unless you pass `-e allow_dirty=true`. Each image gets its own tag, `src-<hash>`, a
+   hash of its build inputs (`api/` or `client/`, plus `packages/` and the root workspace files).
+   So a client-only change rebuilds and ships only the client image.
+3. For each image the server doesn't have yet, it builds a `linux/arm64` image locally with buildx
+   and streams it over SSH straight into `docker load`. No tarball is written to the Pi's disk.
 4. Templates `docker-compose.yml`, `.env` (0600) and `backup.sh`.
 5. Starts postgres and creates or updates the `paypure_app` role and its grants. **If the DB is
    empty**, it restores `files/seed/paypure.dump`. Then it runs migrations (`api-migrate`).
-6. `docker compose up -d --wait`, then removes old paypure images, keeping the last 2.
+6. `docker compose up -d --wait`, then removes old paypure images. Only the running ones are
+   kept (`images_keep: 1`), because the SD card is nearly full.
 7. Installs the nightly backup cron job at 03:30.
 8. Verify: `/login` returns 200, all containers are healthy, `timofeybiryukov@gmail.com` is an
    active admin, and the other services are still running.
@@ -82,6 +85,6 @@ file.
 
 ## Rollback
 
-The previous image version stays on the server. Check out that commit and run
-`ansible-playbook deploy.yml`. The images already exist there, so nothing is rebuilt. Migrations
+Old images are removed after each deploy, so check out the earlier commit and run
+`ansible-playbook deploy.yml`. It rebuilds and ships whichever images differ. Migrations
 only go forward, so rolling back past a migration needs a DB restore.

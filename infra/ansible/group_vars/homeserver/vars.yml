@@ -1,6 +1,5 @@
 # Non-secret settings. Secrets live in vault.yml (ansible-vault).
 repo_root: "{{ playbook_dir }}/../.."
-build_dir: "{{ repo_root }}/infra/build"
 seed_dump: "{{ playbook_dir }}/files/seed/paypure.dump"
 
 paypure_dir: "/home/{{ ansible_user }}/Releases/paypure"
@@ -29,8 +28,8 @@ mem_api: 384m
 mem_client: 384m
 mem_gotenberg: 512m
 
-min_free_disk_gb: 3
-images_keep: 2
+min_free_disk_gb: 1
+images_keep: 1
 
 backup_hour: 3
 backup_minute: 30

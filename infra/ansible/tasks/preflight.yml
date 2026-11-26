@@ -54,10 +54,29 @@
     that: "'dirty' not in version_out.stdout or (allow_dirty | default(false) | bool)"
     fail_msg: "Working tree has uncommitted changes. Commit them or pass -e allow_dirty=true"
 
+- name: Work out per-image tags (hash of each image's build inputs)
+  # A change only rebuilds and ships the image whose sources changed. Hashes the working tree,
+  # so uncommitted changes get their own tag.
+  ansible.builtin.shell: |
+    set -euo pipefail
+    common="packages package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json .dockerignore"
+    for app in api client; do
+      git ls-files -co --exclude-standard -z -- "$app" $common | sort -z \
+        | while IFS= read -r -d '' f; do
+            [ -f "$f" ] && { printf '%s\0' "$f"; sha256sum < "$f"; }
+          done | sha256sum | cut -c1-12 | sed "s/^/$app=src-/"
+    done
+  args: { chdir: "{{ repo_root }}", executable: /bin/bash }
+  delegate_to: localhost
+  run_once: true
+  changed_when: false
+  register: tags_out
+
 - name: Set version
   ansible.builtin.set_fact:
     paypure_version: "{{ version_out.stdout }}"
+    image_tags: "{{ dict(tags_out.stdout_lines | map('split', '=')) }}"
     other_containers: "{{ before_ps.stdout_lines | reject('match', compose_project ~ '-') | list }}"
 
 - ansible.builtin.debug:
-    msg: "Deploying paypure {{ paypure_version }}"
+    msg: "Deploying paypure {{ paypure_version }} (api {{ image_tags.api }}, client {{ image_tags.client }})"

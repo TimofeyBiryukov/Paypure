@@ -1,29 +1,10 @@
-- name: Ship and load images
-  when: have_images.rc != 0
-  block:
-    - name: Images directory exists
-      ansible.builtin.file: { path: "{{ paypure_dir }}/images", state: directory, mode: "0700" }
-
-    - name: Copy tarball
-      ansible.builtin.copy:
-        src: "{{ build_dir }}/paypure-{{ paypure_version }}.tar.gz"
-        dest: "{{ paypure_dir }}/images/"
-        mode: "0600"
-
-    - name: Load images
-      ansible.builtin.command: >-
-        docker load -i {{ paypure_dir }}/images/paypure-{{ paypure_version }}.tar.gz
-      changed_when: true
-
-  always:
-    - name: Remove tarball on the server
-      ansible.builtin.file:
-        path: "{{ paypure_dir }}/images/paypure-{{ paypure_version }}.tar.gz"
-        state: absent
-
-    - name: Remove local tarball
-      ansible.builtin.file:
-        path: "{{ build_dir }}/paypure-{{ paypure_version }}.tar.gz"
-        state: absent
-      delegate_to: localhost
-      run_once: true
+# Streams straight into `docker load` over SSH: no tarball on the server's disk.
+- name: Stream missing images to the server
+  ansible.builtin.shell: >-
+    set -o pipefail &&
+    docker save paypure-{{ item }}:{{ image_tags[item] }} | gzip -1
+    | ssh -o BatchMode=yes {{ ansible_user }}@{{ ansible_host }} docker load
+  args: { executable: /bin/bash }
+  loop: "{{ missing_images }}"
+  delegate_to: localhost
+  changed_when: true
