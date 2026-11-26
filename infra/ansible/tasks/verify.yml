@@ -1,0 +1,38 @@
+- name: Login page answers on localhost
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:{{ paypure_port }}/login"
+    status_code: 200
+  register: login
+  retries: 20
+  delay: 6
+  until: login.status == 200
+
+- name: Paypure containers are up and healthy
+  ansible.builtin.command: >-
+    docker ps --filter label=com.docker.compose.project={{ compose_project }}
+    --format '{{ "{{" }}.Label "com.docker.compose.service"{{ "}}" }} {{ "{{" }}.Status{{ "}}" }}'
+  register: ps
+  changed_when: false
+  failed_when: >-
+    ps.stdout_lines | length < 4
+    or (ps.stdout_lines | select('search', 'unhealthy|starting|Restarting') | list | length) > 0
+
+- name: Admin account is present
+  ansible.builtin.command: >-
+    {{ compose }} exec -T postgres psql -U paypure -d paypure -Atc
+    "select count(*) from members where email = '{{ expected_admin_email }}'
+    and role = 'admin' and status = 'active' and password_hash is not null"
+  register: admin
+  changed_when: false
+  failed_when: admin.stdout | int != 1
+
+- name: Other services still running
+  ansible.builtin.command: docker ps --format '{{ "{{" }}.Names{{ "}}" }}'
+  register: after_ps
+  changed_when: false
+  failed_when: (other_containers | difference(after_ps.stdout_lines) | length) > 0
+
+- ansible.builtin.debug:
+    msg:
+      - "Paypure {{ paypure_version }} is up: {{ paypure_public_url }}"
+      - "{{ ps.stdout_lines }}"

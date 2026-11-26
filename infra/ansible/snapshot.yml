@@ -1,0 +1,52 @@
+# Dump the local dev database into files/seed/paypure.dump (git-ignored).
+# deploy.yml restores it once, into an empty database on the server.
+- name: Snapshot the local Paypure database
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    repo_root: "{{ playbook_dir }}/../.."
+    seed_dump: "{{ playbook_dir }}/files/seed/paypure.dump"
+    psql: docker compose exec -T postgres psql -U paypure -d paypure -Atc
+  tasks:
+    - name: Local postgres is running
+      ansible.builtin.command: docker compose ps --status running --services postgres
+      args: { chdir: "{{ repo_root }}" }
+      register: pg
+      changed_when: false
+      failed_when: "'postgres' not in pg.stdout_lines"
+
+    - name: No unsent emails (the server would send them on start)
+      ansible.builtin.command: >-
+        {{ psql }} "select count(*) from outbound_emails where status <> 'sent'"
+      args: { chdir: "{{ repo_root }}" }
+      register: unsent
+      changed_when: false
+      failed_when: unsent.stdout | int > 0
+
+    - name: Expected admin exists locally
+      ansible.builtin.command: >-
+        {{ psql }} "select count(*) from members where email = 'timofeybiryukov@gmail.com'
+        and role = 'admin' and status = 'active' and password_hash is not null"
+      args: { chdir: "{{ repo_root }}" }
+      register: admin
+      changed_when: false
+      failed_when: admin.stdout | int != 1
+
+    - name: Seed directory exists
+      ansible.builtin.file: { path: "{{ seed_dump | dirname }}", state: directory, mode: "0700" }
+
+    - name: Dump the database (sessions left out)
+      ansible.builtin.shell: >-
+        set -o pipefail &&
+        docker compose exec -T postgres pg_dump -U paypure -d paypure -Fc
+        --no-owner --exclude-table-data=sessions > {{ seed_dump }}.tmp &&
+        mv {{ seed_dump }}.tmp {{ seed_dump }} && chmod 600 {{ seed_dump }}
+      args: { chdir: "{{ repo_root }}", executable: /bin/bash }
+      changed_when: true
+
+    - name: Report
+      ansible.builtin.command: ls -lh {{ seed_dump }}
+      changed_when: false
+      register: ls
+    - ansible.builtin.debug: { msg: "{{ ls.stdout }}" }

@@ -1,0 +1,15 @@
+-- {{ ansible_managed }}
+-- The app role doesn't own the tables, so it can't disable the immutability triggers (08 §3.3).
+-- Idempotent: safe to run on every deploy. Replaces api/prisma/init/01-app-role.sql in prod.
+\set ON_ERROR_STOP on
+SELECT 'CREATE ROLE paypure_app LOGIN'
+ WHERE NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'paypure_app') \gexec
+ALTER ROLE paypure_app WITH LOGIN PASSWORD '{{ vault_app_db_password }}';
+GRANT CONNECT ON DATABASE paypure TO paypure_app;
+GRANT USAGE ON SCHEMA public TO paypure_app;
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO paypure_app;
+GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO paypure_app;
+ALTER DEFAULT PRIVILEGES FOR ROLE paypure IN SCHEMA public
+  GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO paypure_app;
+ALTER DEFAULT PRIVILEGES FOR ROLE paypure IN SCHEMA public
+  GRANT USAGE, SELECT ON SEQUENCES TO paypure_app;

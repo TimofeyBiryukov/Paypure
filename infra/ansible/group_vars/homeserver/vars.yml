@@ -1,0 +1,38 @@
+# Non-secret settings. Secrets live in vault.yml (ansible-vault).
+repo_root: "{{ playbook_dir }}/../.."
+build_dir: "{{ repo_root }}/infra/build"
+seed_dump: "{{ playbook_dir }}/files/seed/paypure.dump"
+
+paypure_dir: "/home/{{ ansible_user }}/Releases/paypure"
+compose_project: paypure
+
+# Published on all host interfaces: localhost, LAN and Tailscale.
+paypure_port: 3000
+paypure_public_url: "http://100.86.233.38:3000"
+public_invoice_links: "false"
+
+postgres_image: postgres:18-alpine
+gotenberg_image: gotenberg/gotenberg:8
+
+mail_transport: smtp
+smtp_url: smtps://smtp.gmail.com:465
+smtp_user: timofeybiryukov@gmail.com
+mail_from: timofeybiryukov@gmail.com
+# Safety net: every email goes here instead of to the client.
+mail_redirect_to: timofeybiryukov@gmail.com
+
+# The account the verify step expects to find after seeding.
+expected_admin_email: timofeybiryukov@gmail.com
+
+mem_postgres: 512m
+mem_api: 384m
+mem_client: 384m
+mem_gotenberg: 512m
+
+min_free_disk_gb: 3
+images_keep: 2
+
+backup_hour: 3
+backup_minute: 30
+backup_keep_daily: 7
+backup_keep_weekly: 4

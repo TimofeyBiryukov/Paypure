@@ -1,0 +1,49 @@
+# Deploy Paypure to the home server. Safe to re-run.
+#   ansible-playbook deploy.yml
+# Options:
+#   -e allow_dirty=true                      deploy uncommitted changes
+#   -e paypure_reset_db=yes-destroy-data     wipe the DB and restore the seed again
+#   -e run_backup_now=true                   run backup.sh once after deploying
+- name: Deploy Paypure
+  hosts: homeserver
+  gather_facts: true
+  vars:
+    compose: docker compose --project-directory {{ paypure_dir }}
+  tasks:
+    - name: Preflight
+      ansible.builtin.import_tasks: tasks/preflight.yml
+      tags: [always]
+
+    - name: Build images locally
+      ansible.builtin.import_tasks: tasks/build.yml
+      tags: [build]
+
+    - name: Ship images
+      ansible.builtin.import_tasks: tasks/ship.yml
+      tags: [build]
+
+    - name: Configure
+      ansible.builtin.import_tasks: tasks/configure.yml
+      tags: [config]
+
+    - name: Database
+      ansible.builtin.import_tasks: tasks/db.yml
+      tags: [db]
+
+    - name: Start the stack
+      ansible.builtin.command: "{{ compose }} up -d --remove-orphans --wait --wait-timeout 300"
+      register: up
+      changed_when: "'Started' in up.stderr or 'Recreated' in up.stderr or 'Created' in up.stderr"
+      tags: [up]
+
+    - name: Prune old images
+      ansible.builtin.import_tasks: tasks/prune.yml
+      tags: [build]
+
+    - name: Backups
+      ansible.builtin.import_tasks: tasks/backup.yml
+      tags: [backup]
+
+    - name: Verify
+      ansible.builtin.import_tasks: tasks/verify.yml
+      tags: [verify]

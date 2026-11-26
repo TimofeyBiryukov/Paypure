@@ -15,7 +15,7 @@ FROM base AS build
 COPY . .
 RUN pnpm install --frozen-lockfile \
  && pnpm --filter @paypure/domain build \
- && pnpm --filter api exec prisma generate \
+ && DATABASE_URL=postgresql://build@localhost/build pnpm --filter api exec prisma generate \
  && pnpm --filter api build \
  && pnpm --filter api deploy --prod --legacy /out \
  && cp -r api/dist api/prisma api/prisma.config.ts /out/

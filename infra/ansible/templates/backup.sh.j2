@@ -1,0 +1,15 @@
+#!/bin/sh
+# {{ ansible_managed }}
+# Nightly pg_dump of Paypure: {{ backup_keep_daily }} daily + {{ backup_keep_weekly }} weekly (Sunday) copies.
+set -eu
+cd "{{ paypure_dir }}"
+dir="{{ paypure_dir }}/backups"
+day=$(date +%F)
+tmp="$dir/.paypure-$day.dump.tmp"
+docker compose exec -T postgres pg_dump -U paypure -d paypure -Fc > "$tmp"
+[ -s "$tmp" ] || { echo "$(date -Is) empty dump" >&2; rm -f "$tmp"; exit 1; }
+mv "$tmp" "$dir/daily-$day.dump"
+[ "$(date +%u)" = 7 ] && cp "$dir/daily-$day.dump" "$dir/weekly-$day.dump"
+ls -1t "$dir"/daily-*.dump 2>/dev/null | tail -n +{{ backup_keep_daily + 1 }} | xargs -r rm -f
+ls -1t "$dir"/weekly-*.dump 2>/dev/null | tail -n +{{ backup_keep_weekly + 1 }} | xargs -r rm -f
+echo "$(date -Is) ok $(du -h "$dir/daily-$day.dump" | cut -f1)"

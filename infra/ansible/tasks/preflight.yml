@@ -1,0 +1,63 @@
+- name: Server is arm64
+  ansible.builtin.assert:
+    that: ansible_architecture == "aarch64"
+    fail_msg: "Images are built for linux/arm64, host is {{ ansible_architecture }}"
+
+- name: Docker works without sudo
+  ansible.builtin.command: docker info --format '{{ "{{" }}.ServerVersion{{ "}}" }}'
+  changed_when: false
+
+- name: Enough free disk on /
+  ansible.builtin.assert:
+    that: >-
+      (ansible_mounts | selectattr('mount', 'equalto', '/') | first).size_available
+      > min_free_disk_gb * 1024 ** 3
+    fail_msg: "Less than {{ min_free_disk_gb }} GB free on /"
+
+- name: Who holds port {{ paypure_port }}
+  ansible.builtin.shell: >-
+    if ss -Htln "sport = :{{ paypure_port }}" | grep -q .; then
+    docker ps --filter publish={{ paypure_port }} --format '{{ "{{" }}.Names{{ "}}" }}';
+    echo in-use; fi
+  changed_when: false
+  register: port
+
+- name: Port {{ paypure_port }} is free or ours
+  ansible.builtin.assert:
+    that: "'in-use' not in port.stdout or (compose_project ~ '-client-1') in port.stdout"
+    fail_msg: "Port {{ paypure_port }} is used by something else: {{ port.stdout }}"
+
+- name: Record the other running containers
+  ansible.builtin.command: docker ps --format '{{ "{{" }}.Names{{ "}}" }}'
+  changed_when: false
+  register: before_ps
+
+- name: Work out the release version (git sha)
+  ansible.builtin.shell: |
+    set -euo pipefail
+    sha=$(git rev-parse --short HEAD)
+    if [ -n "$(git status --porcelain)" ]; then
+      dirty=$( { git diff HEAD; git ls-files -o --exclude-standard -z \
+        | xargs -0 -r sha1sum; } | sha1sum | cut -c1-8 )
+      echo "$sha-dirty-$dirty"
+    else
+      echo "$sha"
+    fi
+  args: { chdir: "{{ repo_root }}", executable: /bin/bash }
+  delegate_to: localhost
+  run_once: true
+  changed_when: false
+  register: version_out
+
+- name: Refuse uncommitted changes unless allowed
+  ansible.builtin.assert:
+    that: "'dirty' not in version_out.stdout or (allow_dirty | default(false) | bool)"
+    fail_msg: "Working tree has uncommitted changes. Commit them or pass -e allow_dirty=true"
+
+- name: Set version
+  ansible.builtin.set_fact:
+    paypure_version: "{{ version_out.stdout }}"
+    other_containers: "{{ before_ps.stdout_lines | reject('match', compose_project ~ '-') | list }}"
+
+- ansible.builtin.debug:
+    msg: "Deploying paypure {{ paypure_version }}"

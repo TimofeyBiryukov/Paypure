@@ -1,0 +1,28 @@
+- name: Release directories exist
+  ansible.builtin.file: { path: "{{ item }}", state: directory, mode: "0750" }
+  loop:
+    - "{{ paypure_dir }}"
+    - "{{ paypure_dir }}/backups"
+
+- name: Compose file
+  ansible.builtin.template:
+    src: docker-compose.yml.j2
+    dest: "{{ paypure_dir }}/docker-compose.yml"
+    mode: "0644"
+
+- name: Environment file
+  ansible.builtin.template:
+    src: env.j2
+    dest: "{{ paypure_dir }}/.env"
+    mode: "0600"
+  diff: false
+
+- name: Backup script
+  ansible.builtin.template:
+    src: backup.sh.j2
+    dest: "{{ paypure_dir }}/backup.sh"
+    mode: "0700"
+
+- name: Compose config is valid
+  ansible.builtin.command: "{{ compose }} config --quiet"
+  changed_when: false

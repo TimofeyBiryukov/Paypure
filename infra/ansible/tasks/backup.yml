@@ -1,0 +1,15 @@
+- name: Nightly backup cron job
+  ansible.builtin.cron:
+    name: paypure backup
+    hour: "{{ backup_hour }}"
+    minute: "{{ backup_minute }}"
+    job: "{{ paypure_dir }}/backup.sh >> {{ paypure_dir }}/backups/backup.log 2>&1"
+
+- name: Run a backup now
+  when: run_backup_now | default(false) | bool
+  ansible.builtin.command: "{{ paypure_dir }}/backup.sh"
+  register: backup_now
+  changed_when: true
+
+- ansible.builtin.debug: { msg: "{{ backup_now.stdout }}" }
+  when: run_backup_now | default(false) | bool
