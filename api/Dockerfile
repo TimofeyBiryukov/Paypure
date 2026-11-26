@@ -7,6 +7,8 @@ WORKDIR /app
 
 # dev: deps only, source is bind-mounted (Tech §7.1)
 FROM base AS dev
+# pdftotext, for the one-off Paydirt import (cli import:paydirt, docs/paypure/05 §4)
+RUN apk add --no-cache poppler-utils
 CMD ["sh"]
 
 FROM base AS build

@@ -46,7 +46,7 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Pro
   const me = (await getMe())!;
   if (!me.isAdmin) redirect("/");
   const sp = await searchParams;
-  const tab = sp.tab ?? "all";
+  const tab = sp.tab ?? "outstanding";
   const qs = new URLSearchParams({ tab });
   if (sp.client) qs.set("client", sp.client);
   if (sp.void) qs.set("void", sp.void);

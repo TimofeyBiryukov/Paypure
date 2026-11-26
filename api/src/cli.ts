@@ -2,13 +2,14 @@
  * Admin CLI (Tech §5.3). No self-signup in v1:
  *   docker compose exec api pnpm --filter api cli workspace:create --name "Northwind" --admin-email you@example.com
  *   docker compose exec api pnpm --filter api cli seed:demo
+ *   docker compose exec api pnpm --filter api cli import:paydirt --dir /app/data --dry-run
  */
-import { createHash, randomBytes } from "node:crypto";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { addDays, fromWallTime, todayIn, toLocalDate } from "@paypure/domain";
 import * as argon2 from "argon2";
 import { PrismaClient } from "./generated/prisma/client";
-import { DEFAULT_TEMPLATES } from "./modules/invoice-ops";
+import { importPaydirt } from "./paydirt/command";
+import { createWorkspace } from "./workspace";
 
 const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL as string }) });
 
@@ -21,51 +22,6 @@ function args() {
   return out;
 }
 
-async function createWorkspace(o: {
-  name: string;
-  adminEmail: string;
-  adminName?: string;
-  currency?: string;
-  tz?: string;
-  format?: string;
-  reset?: "never" | "yearly";
-  next?: number;
-  password?: string;
-}) {
-  const tz = o.tz ?? "Europe/Berlin";
-  const ws = await prisma.workspace.create({
-    data: {
-      name: o.name,
-      businessName: o.name,
-      currency: o.currency ?? "EUR",
-      timeZone: tz,
-      numberFormat: o.format ?? "INV-{YYYY}-{seq:4}",
-      numberReset: o.reset ?? "yearly",
-    },
-  });
-  for (const [kind, t] of Object.entries(DEFAULT_TEMPLATES)) {
-    await prisma.emailTemplate.create({ data: { workspaceId: ws.id, kind: kind as keyof typeof DEFAULT_TEMPLATES, subject: t.subject, body: t.body } });
-  }
-  if (o.next) {
-    const period = (o.reset ?? "yearly") === "yearly" ? todayIn(tz).slice(0, 4) : "";
-    await prisma.invoiceSequence.create({ data: { workspaceId: ws.id, period, nextSeq: o.next } });
-  }
-  const token = randomBytes(32).toString("base64url");
-  const admin = await prisma.member.create({
-    data: {
-      workspaceId: ws.id,
-      name: o.adminName ?? o.adminEmail.split("@")[0],
-      email: o.adminEmail.toLowerCase(),
-      role: "admin",
-      status: o.password ? "active" : "invited",
-      timeZone: tz,
-      passwordHash: o.password ? await argon2.hash(o.password, { type: argon2.argon2id }) : null,
-      inviteToken: o.password ? null : createHash("sha256").update(token).digest("hex"),
-    },
-  });
-  return { ws, admin, inviteUrl: `${process.env.PUBLIC_URL ?? "http://localhost:3000"}/invite/${token}` };
-}
-
 async function seedDemo() {
   const existing = await prisma.member.findFirst({ where: { email: "admin@example.com" } });
   if (existing) {
@@ -74,7 +30,7 @@ async function seedDemo() {
   }
   const tz = "Europe/Berlin";
   // Our workspace continues Paydirt's sequence: {seq:3}, never reset, next 188 (D9).
-  const { ws, admin } = await createWorkspace({
+  const { ws, admin } = await createWorkspace(prisma, {
     name: "Northwind Studio",
     adminEmail: "admin@example.com",
     adminName: "Jane Doe",
@@ -240,7 +196,7 @@ async function main() {
       console.error("Usage: workspace:create --name <name> --admin-email <email> [--currency EUR] [--tz Europe/Berlin] [--format {seq:3}] [--reset never] [--next 188]");
       process.exit(1);
     }
-    const r = await createWorkspace({
+    const r = await createWorkspace(prisma, {
       name: a.name,
       adminEmail: a["admin-email"],
       adminName: a["admin-name"],
@@ -253,8 +209,21 @@ async function main() {
     console.log(`Workspace "${r.ws.name}" created. One-time invite link for ${r.admin.email}:\n${r.inviteUrl}`);
   } else if (cmd === "seed:demo") {
     await seedDemo();
+  } else if (cmd === "import:paydirt") {
+    if (!a.dir || (!a["dry-run"] && !a["admin-email"])) {
+      console.error("Usage: import:paydirt --dir <export dir> (--dry-run | --admin-email <email> [--admin-name <name>]) [--allow-stale]");
+      process.exit(1);
+    }
+    const ok = await importPaydirt(prisma, {
+      dir: a.dir,
+      dryRun: a["dry-run"] === "true",
+      allowStale: a["allow-stale"] === "true",
+      adminEmail: a["admin-email"],
+      adminName: a["admin-name"],
+    });
+    if (!ok) process.exitCode = 2;
   } else {
-    console.error("Commands: workspace:create, seed:demo");
+    console.error("Commands: workspace:create, seed:demo, import:paydirt");
     process.exit(1);
   }
 }

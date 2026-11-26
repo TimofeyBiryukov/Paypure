@@ -14,6 +14,9 @@ Open http://localhost:3000 and sign in as `admin@example.com` / `paypure-demo` (
 `member@example.com` / `paypure-demo` (Member). The demo workspace continues Paydirt's numbering,
 so the first invoice gets number **188**.
 
+Moving from Paydirt: `docker compose exec api pnpm --filter api cli import:paydirt --dir /app/data --dry-run`,
+then without `--dry-run` and with `--admin-email` (docs/paypure/05 §4).
+
 Optional: `docker compose --profile tools up -d adminer` (DB UI on :8081). Emails use
 `MAIL_TRANSPORT=log` by default: each one is written in full to the API log (`docker compose logs api`).
 To really send them (e.g. from your Gmail), see [docs/email-setup.md](docs/email-setup.md).
@@ -51,5 +54,5 @@ docker compose exec api pnpm exec biome lint client/src api/src
 - **Email:** `log` by default; `smtp` sends through any SMTP account (Gmail App Password, Mailpit) configured in `.env`. Delivery runs inside the outbox row's transaction, so a slow SMTP server holds that row lock while it sends.
 - **Public link token** is stored in plain text so admins can copy it; the docs ask for it hashed.
 - **Invites** return a link to copy instead of sending an email; password reset isn't built.
-- **Not built:** Paydirt CSV migration (05 §4), logo upload, task reordering, duplicate project, "Add unbilled time" into an existing draft, inline "Create task" in the picker, i18n keys (next-intl), Playwright and API e2e tests, prod compose (Traefik, backups).
+- **Not built:** logo upload, task reordering, duplicate project, "Add unbilled time" into an existing draft, inline "Create task" in the picker, i18n keys (next-intl), Playwright and API e2e tests, prod compose (Traefik, backups).
 - Dev memory limits for `api`/`client` are higher than the prod budget in Tech §9 (`next dev` needs more).

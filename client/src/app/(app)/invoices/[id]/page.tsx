@@ -52,6 +52,7 @@ interface Inv {
 }
 
 const ACTIVITY: Record<string, string> = {
+  imported: "Imported from Paydirt",
   created: "Created",
   sent: "Sent",
   marked_sent: "Marked as sent",
